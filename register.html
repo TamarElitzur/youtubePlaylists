@@ -11,7 +11,40 @@
   </header>
 
   <main>
-    <p>Here will be the registration form (username, password, confirm password, first name, image URL).</p>
+    <form id="registerForm">
+      <div>
+        <label for="username">Username *</label>
+        <input type="text" id="username" required />
+      </div>
+
+      <div>
+        <label for="password">Password *</label>
+        <input type="password" id="password" required />
+      </div>
+
+      <div>
+        <label for="confirmPassword">Confirm Password *</label>
+        <input type="password" id="confirmPassword" required />
+      </div>
+
+      <div>
+        <label for="firstName">First Name *</label>
+        <input type="text" id="firstName" required />
+      </div>
+
+      <div>
+        <label for="imageUrl">Profile Image URL *</label>
+        <input type="url" id="imageUrl" required />
+      </div>
+
+      <button type="submit">Register</button>
+    </form>
+
+    <div id="errorMessages" style="color:red; margin-top:10px;"></div>
+
+    <p>Already have an account? <a href="login.html">Login here</a></p>
   </main>
+
+  <script src="register.js"></script>
 </body>
 </html>
