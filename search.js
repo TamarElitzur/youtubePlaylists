@@ -30,17 +30,19 @@ if (!currentUserJson) {
 const searchInput = document.getElementById("searchInput");
 const searchButton = document.getElementById("searchButton");
 
-// when clicking the search button
-searchButton.addEventListener("click", function () {
-  const query = searchInput.value.trim();
+if (searchInput && searchButton) {
+  searchButton.addEventListener("click", function () {
+    const query = searchInput.value.trim();
 
-  if (!query) {
-    alert("Please enter search text.");
-    return;
-  }
+    if (!query) {
+      alert("Please enter search text.");
+      return;
+    }
 
-  console.log("User searched for:", query);
+    console.log("User searched for:", query);
 
-  // later we will call YouTube API here
-});
-
+    // later we will call YouTube API here
+  });
+} else {
+  console.error("Search elements not found in the DOM");
+}

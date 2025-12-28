@@ -7,30 +7,28 @@
 </head>
 <body>
   <header>
-  <div class="top-bar">
-    <span id="welcomeText"></span>
-    <img id="userImage" alt="Profile image" />
-  </div>
+    <div class="top-bar">
+      <span id="welcomeText"></span>
+      <img id="userImage" alt="Profile image" />
+    </div>
 
-  <h1>Search Page</h1>
-</header>
+    <h1>Search Page</h1>
+  </header>
 
   <main>
+    <div id="searchArea">
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="Search for song or artist..."
+      />
+      <button id="searchButton">Search</button>
+    </div>
 
-  <div id="searchArea">
-    <input
-      type="text"
-      id="searchInput"
-      placeholder="Search for song or artist..."
-    />
-    <button id="searchButton">Search</button>
-  </div>
-
-  <div id="resultsContainer">
-
-  </div>
-
-</main>
+    <div id="resultsContainer">
+      <!-- Here we will show the search results cards -->
+    </div>
+  </main>
 
   <script src="search.js"></script>
 </body>
