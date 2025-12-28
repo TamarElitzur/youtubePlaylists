@@ -7,17 +7,30 @@
 </head>
 <body>
   <header>
-    <h1>Search Page</h1>
+  <div class="top-bar">
+    <span id="welcomeText"></span>
+    <img id="userImage" alt="Profile image" />
+  </div>
 
-    <div id="userInfo" class="user-info">
-      <img id="userImage" alt="Profile image" />
-      <span id="welcomeText"></span>
-    </div>
-  </header>
+  <h1>Search Page</h1>
+</header>
 
   <main>
-    <p>Here we will later build the YouTube search, results and favorites.</p>
-  </main>
+
+  <div id="searchArea">
+    <input
+      type="text"
+      id="searchInput"
+      placeholder="Search for song or artist..."
+    />
+    <button id="searchButton">Search</button>
+  </div>
+
+  <div id="resultsContainer">
+
+  </div>
+
+</main>
 
   <script src="search.js"></script>
 </body>

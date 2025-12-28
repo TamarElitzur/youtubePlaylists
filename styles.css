@@ -38,3 +38,40 @@ main {
   border-radius: 50%;
   object-fit: cover;
 }
+
+.top-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+#userImage {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+#welcomeText {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+#searchArea {
+  margin: 20px 0;
+}
+
+#searchInput {
+  width: 300px;
+  padding: 5px;
+}
+
+#searchButton {
+  padding: 5px 10px;
+}
+
+#resultsContainer {
+  margin-top: 20px;
+}

@@ -24,3 +24,23 @@ if (!currentUserJson) {
     window.location.href = "login.html";
   }
 }
+
+// search box logic
+
+const searchInput = document.getElementById("searchInput");
+const searchButton = document.getElementById("searchButton");
+
+// when clicking the search button
+searchButton.addEventListener("click", function () {
+  const query = searchInput.value.trim();
+
+  if (!query) {
+    alert("Please enter search text.");
+    return;
+  }
+
+  console.log("User searched for:", query);
+
+  // later we will call YouTube API here
+});
+
