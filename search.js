@@ -30,21 +30,123 @@ const searchInput = document.getElementById("searchInput");
 const searchButton = document.getElementById("searchButton");
 const resultsContainer = document.getElementById("resultsContainer");
 
+// toast elements
+const toast = document.getElementById("toast");
+const toastMessage = document.getElementById("toastMessage");
+const toastLink = document.getElementById("toastLink");
+let toastTimeoutId = null;
+
+function showToast(message) {
+  if (!toast || !toastMessage) return;
+
+  toastMessage.textContent = message;
+
+  toast.classList.remove("hidden");
+  toast.classList.add("show");
+
+  // hide after 4 seconds
+  if (toastTimeoutId) {
+    clearTimeout(toastTimeoutId);
+  }
+
+  toastTimeoutId = setTimeout(() => {
+    toast.classList.remove("show");
+    toast.classList.add("hidden");
+  }, 4000);
+}
+
+
 // call YouTube Data API to search videos
+// helper
+function formatDuration(isoDuration) {
+  if (!isoDuration) return "";
+  const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return "";
+
+  const hours = parseInt(match[1] || "0", 10);
+  const minutes = parseInt(match[2] || "0", 10);
+  const seconds = parseInt(match[3] || "0", 10);
+
+  const pad = (n) => String(n).padStart(2, "0");
+  if (hours > 0) {
+    return `${hours}:${pad(minutes)}:${pad(seconds)}`;
+  }
+  return `${minutes}:${pad(seconds)}`;
+}
+
+// helper - display views number
+function formatViews(countStr) {
+  const count = Number(countStr || 0);
+  if (count >= 1_000_000) {
+    return (count / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M views";
+  }
+  if (count >= 1_000) {
+    return (count / 1_000).toFixed(1).replace(/\.0$/, "") + "K views";
+  }
+  return count + " views";
+}
+
+// call YouTube Data API to search videos + bring duration and views
 async function searchYouTube(query) {
-  const url = `${YOUTUBE_SEARCH_URL}?part=snippet&type=video&maxResults=10&q=${encodeURIComponent(
+  // bring only basic search - snippet
+  const searchUrl = `${YOUTUBE_SEARCH_URL}?part=snippet&type=video&maxResults=10&q=${encodeURIComponent(
     query
   )}&key=${YOUTUBE_API_KEY}`;
 
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error("YouTube API request failed");
+  const searchResponse = await fetch(searchUrl);
+  if (!searchResponse.ok) {
+    throw new Error("YouTube API search request failed");
   }
 
-  const data = await response.json();
-  return data.items; // array of videos
+  const searchData = await searchResponse.json();
+  const items = searchData.items || [];
+
+  if (items.length === 0) {
+    return [];
+  }
+
+  // collect all the videoId for bring another details
+  const videoIds = items
+    .map((item) => item.id && item.id.videoId)
+    .filter(Boolean);
+
+  const detailsUrl =
+    "https://www.googleapis.com/youtube/v3/videos" +
+    `?part=contentDetails,statistics&id=${videoIds.join(",")}` +
+    `&key=${YOUTUBE_API_KEY}`;
+
+  const detailsResponse = await fetch(detailsUrl);
+  if (!detailsResponse.ok) {
+    // if fail - return only the basic data
+    console.warn("Failed to load video details", detailsResponse.status);
+    return items;
+  }
+
+  const detailsData = await detailsResponse.json();
+  const detailsItems = detailsData.items || [];
+
+  // build map from videoId → details
+  const detailsMap = {};
+  detailsItems.forEach((d) => {
+    detailsMap[d.id] = d;
+  });
+
+  // connect the data to original videos
+  items.forEach((item) => {
+    const vid = item.id && item.id.videoId;
+    const d = detailsMap[vid];
+    if (d) {
+      const durationIso = d.contentDetails && d.contentDetails.duration;
+      const views = d.statistics && d.statistics.viewCount;
+
+      item.durationText = formatDuration(durationIso);
+      item.viewsText = formatViews(views);
+    }
+  });
+
+  return items;
 }
+
 
 // render the videos as cards
 function renderResults(items) {
@@ -56,73 +158,100 @@ function renderResults(items) {
   }
 
   items.forEach((item) => {
-  const videoId = item.id.videoId;
-  const title = item.snippet.title;
-  const thumbnail = item.snippet.thumbnails.medium.url;
+    const videoId = item.id.videoId;
+    const title = item.snippet.title;
+    const thumbnail = item.snippet.thumbnails.medium.url;
 
-  const card = document.createElement("div");
-  card.className = "video-card";
+    const card = document.createElement("div");
+    card.className = "video-card";
 
-  const img = document.createElement("img");
-  img.src = thumbnail;
-  img.alt = title;
+    const img = document.createElement("img");
+    img.src = thumbnail;
+    img.alt = title;
 
-  const h3 = document.createElement("h3");
-  h3.textContent = title;
-  h3.title = title; // tooltip
+    // all the data text
+    const infoDiv = document.createElement("div");
+    infoDiv.className = "video-info";
 
-  // little V
-  const favIndicator = document.createElement("span");
-  favIndicator.className = "favorite-indicator";
-  favIndicator.textContent = "✓";
-  favIndicator.style.display = "none";
-  h3.appendChild(favIndicator);
+    const h3 = document.createElement("h3");
+    h3.textContent = title;
+    h3.title = title; // tooltip
 
-  const playBtn = document.createElement("button");
-  playBtn.textContent = "Play";
+    // V duration + views
+    const meta = document.createElement("div");
+    meta.className = "video-meta";
 
-  const favBtn = document.createElement("button");
-  favBtn.textContent = "Add to favorites";
+    let metaText = "";
+    if (item.durationText) {
+      metaText += item.durationText;
+    }
+    if (item.viewsText) {
+      metaText += metaText ? " • " + item.viewsText : item.viewsText;
+    }
+    meta.textContent = metaText;
 
-  // check if already in favorites
-  const alreadyFavorite = isVideoInFavorites(videoId);
-  if (alreadyFavorite) {
-    favBtn.textContent = "In favorites ✓";
-    favBtn.disabled = true;
-    favBtn.classList.add("in-favorites");
-    favIndicator.style.display = "inline";
-  }
+    // little V if already in favorites
+    const favIndicator = document.createElement("span");
+    favIndicator.className = "favorite-indicator";
+    favIndicator.textContent = "✓";
+    favIndicator.style.display = "none";
+    h3.appendChild(favIndicator);
 
-  favBtn.addEventListener("click", () => {
-    addToFavorites({
-      videoId,
-      title,
-      thumbnail,
-    });
+    // V buttons
+    const actionsDiv = document.createElement("div");
+    actionsDiv.className = "video-actions";
 
-    // after we tried to add - if now it's in favorites, we will lock the button
-    if (isVideoInFavorites(videoId)) {
+    const playBtn = document.createElement("button");
+    playBtn.textContent = "Play";
+
+    const favBtn = document.createElement("button");
+    favBtn.textContent = "Add to favorites";
+
+    // check if already in favorites
+    const alreadyFavorite = isVideoInFavorites(videoId);
+    if (alreadyFavorite) {
       favBtn.textContent = "In favorites ✓";
       favBtn.disabled = true;
       favBtn.classList.add("in-favorites");
       favIndicator.style.display = "inline";
     }
-  });
 
+    favBtn.addEventListener("click", () => {
+      addToFavorites({
+        videoId,
+        title,
+        thumbnail,
+      });
+
+      // after the adding - lock the button if now in favorites
+      if (isVideoInFavorites(videoId)) {
+        favBtn.textContent = "In favorites ✓";
+        favBtn.disabled = true;
+        favBtn.classList.add("in-favorites");
+        favIndicator.style.display = "inline";
+      }
+    });
 
     // all of these open the modal
     img.addEventListener("click", () => openModal(videoId, title));
     h3.addEventListener("click", () => openModal(videoId, title));
     playBtn.addEventListener("click", () => openModal(videoId, title));
 
+    // connecting all together
+    actionsDiv.appendChild(playBtn);
+    actionsDiv.appendChild(favBtn);
+
+    infoDiv.appendChild(h3);
+    infoDiv.appendChild(meta);
+    infoDiv.appendChild(actionsDiv);
+
     card.appendChild(img);
-    card.appendChild(h3);
-    card.appendChild(playBtn);
-    card.appendChild(favBtn);
+    card.appendChild(infoDiv);
 
     resultsContainer.appendChild(card);
   });
 }
+
 
 
 // query string helpers
@@ -200,7 +329,7 @@ function addToFavorites(video) {
 
   saveFavorites(favorites);
 
-  alert("Added to favorites!");
+  showToast("Video added to your favorites playlist.");
 }
 
 // check if a video is already in user's favorites
