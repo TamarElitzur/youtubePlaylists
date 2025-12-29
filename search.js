@@ -76,9 +76,15 @@ function renderResults(items) {
 
     const favBtn = document.createElement("button");
     favBtn.textContent = "Add to favorites";
+
     favBtn.addEventListener("click", () => {
-      alert("In the next step we'll save this to a playlist 🙂");
+      addToFavorites({
+        videoId,
+        title,
+        thumbnail
+      });
     });
+
 
     // all of these open the modal
     img.addEventListener("click", () => openModal(videoId, title));
@@ -126,6 +132,53 @@ async function performSearch(query) {
     resultsContainer.textContent = "Error searching YouTube.";
   }
 }
+
+// ---------- FAVORITES STORAGE ----------
+
+// read favorites object from localStorage
+function getFavorites() {
+  const json = localStorage.getItem("favorites");
+  if (!json) return {};
+  try {
+    return JSON.parse(json);
+  } catch {
+    return {};
+  }
+}
+
+// save favorites object to localStorage
+function saveFavorites(favs) {
+  localStorage.setItem("favorites", JSON.stringify(favs));
+}
+
+// add video to current user's favorites
+function addToFavorites(video) {
+  const currentUser = JSON.parse(sessionStorage.getItem("currentUser"));
+  if (!currentUser) return;
+
+  const username = currentUser.username;
+
+  const favorites = getFavorites();
+
+  // if user has no list yet → create it
+  if (!favorites[username]) {
+    favorites[username] = [];
+  }
+
+  // avoid duplicates
+  const exists = favorites[username].some(v => v.videoId === video.videoId);
+  if (exists) {
+    alert("This video is already in your favorites 🙂");
+    return;
+  }
+
+  favorites[username].push(video);
+
+  saveFavorites(favorites);
+
+  alert("Added to favorites!");
+}
+
 
 // search box logic
 if (searchInput && searchButton && resultsContainer) {
