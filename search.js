@@ -56,34 +56,58 @@ function renderResults(items) {
   }
 
   items.forEach((item) => {
-    const videoId = item.id.videoId;
-    const title = item.snippet.title;
-    const thumbnail = item.snippet.thumbnails.medium.url;
+  const videoId = item.id.videoId;
+  const title = item.snippet.title;
+  const thumbnail = item.snippet.thumbnails.medium.url;
 
-    const card = document.createElement("div");
-    card.className = "video-card";
+  const card = document.createElement("div");
+  card.className = "video-card";
 
-    const img = document.createElement("img");
-    img.src = thumbnail;
-    img.alt = title;
+  const img = document.createElement("img");
+  img.src = thumbnail;
+  img.alt = title;
 
-    const h3 = document.createElement("h3");
-    h3.textContent = title;
-    h3.title = title; // tooltip
+  const h3 = document.createElement("h3");
+  h3.textContent = title;
+  h3.title = title; // tooltip
 
-    const playBtn = document.createElement("button");
-    playBtn.textContent = "Play";
+  // little V
+  const favIndicator = document.createElement("span");
+  favIndicator.className = "favorite-indicator";
+  favIndicator.textContent = "✓";
+  favIndicator.style.display = "none";
+  h3.appendChild(favIndicator);
 
-    const favBtn = document.createElement("button");
-    favBtn.textContent = "Add to favorites";
+  const playBtn = document.createElement("button");
+  playBtn.textContent = "Play";
 
-    favBtn.addEventListener("click", () => {
-      addToFavorites({
-        videoId,
-        title,
-        thumbnail
-      });
+  const favBtn = document.createElement("button");
+  favBtn.textContent = "Add to favorites";
+
+  // check if already in favorites
+  const alreadyFavorite = isVideoInFavorites(videoId);
+  if (alreadyFavorite) {
+    favBtn.textContent = "In favorites ✓";
+    favBtn.disabled = true;
+    favBtn.classList.add("in-favorites");
+    favIndicator.style.display = "inline";
+  }
+
+  favBtn.addEventListener("click", () => {
+    addToFavorites({
+      videoId,
+      title,
+      thumbnail,
     });
+
+    // after we tried to add - if now it's in favorites, we will lock the button
+    if (isVideoInFavorites(videoId)) {
+      favBtn.textContent = "In favorites ✓";
+      favBtn.disabled = true;
+      favBtn.classList.add("in-favorites");
+      favIndicator.style.display = "inline";
+    }
+  });
 
 
     // all of these open the modal
@@ -177,6 +201,18 @@ function addToFavorites(video) {
   saveFavorites(favorites);
 
   alert("Added to favorites!");
+}
+
+// check if a video is already in user's favorites
+function isVideoInFavorites(videoId) {
+  const currentUser = JSON.parse(sessionStorage.getItem("currentUser"));
+  if (!currentUser) return false;
+
+  const username = currentUser.username;
+  const favorites = getFavorites();
+  const list = favorites[username] || [];
+
+  return list.some((v) => v.videoId === videoId);
 }
 
 

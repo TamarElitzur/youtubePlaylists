@@ -199,3 +199,17 @@ main {
   margin-top: 6px;
   font-size: 14px;
 }
+
+/* ----- Search page: already in favorites ----- */
+
+.in-favorites {
+  background-color: #ccc;
+  color: #555;
+  cursor: default;
+}
+
+.favorite-indicator {
+  color: green;
+  font-weight: bold;
+  margin-left: 6px;
+}
