@@ -2,41 +2,117 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>YouTube Playlists App - Home</title>
+  <title>My playlists – Landing</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header>
-    <h1>YouTube Playlists App</h1>
+  <!-- Floating header -->
+  <header class="main-header">
+    <div class="main-header-inner">
+      <!-- Logo + title -->
+      <div class="brand">
+        <div class="brand-logo">♪</div>
+        <div class="brand-title">My Playlists</div>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="main-nav">
+        <a href="index.html" class="nav-link nav-link-active">Home</a>
+        <a href="search.html" class="nav-link">Search</a>
+        <a href="playlists.html" class="nav-link">My playlists</a>
+        <a href="login.html" class="nav-link">Login</a>
+      </nav>
+
+      <!-- Right side – CTA -->
+      <div class="user-area">
+        <button onclick="window.location.href='register.html'"
+                class="ghost-button">
+          Get started
+        </button>
+      </div>
+    </div>
   </header>
 
+  <!-- MAIN CONTENT -->
   <main>
-    <section>
-      <h2>Student Details</h2>
-      <p>Name: Tamar Elitzur</p>
-      <p>ID: 302548193</p>
+    <section class="hero">
+      <div class="hero-left">
+        <div class="hero-badge">
+          <span class="badge-dot"></span>
+          Your personal YouTube playlist hub
+        </div>
+
+        <h1 class="hero-title">
+          Collect the songs you love, <br />
+          in playlists that feel like you.
+        </h1>
+
+        <p class="hero-subtitle">
+          Search YouTube, save your favorite tracks, rate them,
+          and keep everything organized in one magic place.
+        </p>
+
+        <div class="hero-cta-buttons">
+          <button class="primary-cta"
+                  onclick="window.location.href='search.html'">
+            Start searching
+          </button>
+          <button class="secondary-cta"
+                  onclick="window.location.href='register.html'">
+            Create an account
+          </button>
+        </div>
+
+        <p class="hero-tagline">
+          No backend, no signup spam – just your browser, your playlists,
+          and your music. 🎵
+        </p>
+      </div>
+
+      <!-- Right side: visual cards -->
+      <div class="hero-right">
+        <div class="glass-card glass-main">
+          <div class="glass-header">
+            <span class="glass-title">Favorites playlist</span>
+            <span class="glass-chip">⭐ 25 tracks</span>
+          </div>
+
+          <ul class="mini-tracklist">
+            <li>
+              <span class="track-title">Dancing Queen</span>
+              <span class="track-meta">ABBA · 3:51</span>
+            </li>
+            <li>
+              <span class="track-title">Baby One More Time</span>
+              <span class="track-meta">Britney Spears · 3:30</span>
+            </li>
+            <li>
+              <span class="track-title">The Sound of Silence</span>
+              <span class="track-meta">Disturbed · 4:08</span>
+            </li>
+          </ul>
+
+          <div class="glass-footer">
+            <span class="pill-tag">Sort by rating</span>
+            <span class="pill-tag pill-tag-alt">Filter by artist</span>
+          </div>
+        </div>
+
+        <div class="glass-card glass-secondary">
+          <p class="stat-label">Built for my Web course</p>
+          <div class="stat-row">
+            <div class="stat">
+              <span class="stat-number">10</span>
+              <span class="stat-text">results per search</span>
+            </div>
+            <div class="stat">
+              <span class="stat-number">5★</span>
+              <span class="stat-text">rating per song</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
-
-    <section>
-    <h2>Links</h2>
-    <ul>
-        <li>
-        <a href="https://github.com/TamarElitzur/youtubePlaylists" target="_blank">
-            GitHub Repository
-        </a>
-        </li>
-
-        <li>
-        <a href="https://tamarelitzur.github.io/youtubePlaylists/" target="_blank">
-            Live Website
-        </a>
-        </li>
-
-        <li><a href="login.html">Login Page</a></li>
-        <li><a href="register.html">Register Page</a></li>
-    </ul>
-    </section>
-
   </main>
 </body>
 </html>
