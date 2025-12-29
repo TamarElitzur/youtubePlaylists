@@ -53,6 +53,28 @@
     <a id="toastLink" href="playlists.html">Go to playlist</a>
   </div>
 
+  <!-- Playlist chooser modal -->
+  <div id="playlistChooser" class="modal">
+    <div class="modal-content">
+      <span id="chooserClose" class="modal-close">&times;</span>
+      <h2>Choose playlist</h2>
+
+      <div id="playlistChooserList"></div>
+
+      <hr />
+
+      <div class="playlist-chooser-new">
+        <input
+          type="text"
+          id="newPlaylistName"
+          placeholder="New playlist name..."
+        />
+        <button id="createPlaylistBtn">Create</button>
+      </div>
+    </div>
+  </div>
+
+
   <script src="search.js"></script>
 </body>
 </html>

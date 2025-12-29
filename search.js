@@ -3,48 +3,79 @@ console.log("search.js loaded");
 const YOUTUBE_API_KEY = "AIzaSyCzM8S4Q9h5vo-fyRIc55sdO1Xk3ikRYjI";
 const YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search";
 
-// user info (Hello, name + image)
+// ---------- current user (Hello, name + image) ----------
+
 const currentUserJson = sessionStorage.getItem("currentUser");
+let currentUser = null;
 
 if (!currentUserJson) {
   const returnUrl = encodeURIComponent(window.location.href);
   window.location.href = `login.html?returnUrl=${returnUrl}`;
 } else {
   try {
-    const currentUser = JSON.parse(currentUserJson);
+    currentUser = JSON.parse(currentUserJson);
 
     const welcomeText = document.getElementById("welcomeText");
     const userImage = document.getElementById("userImage");
 
-    welcomeText.textContent = `Hello, ${currentUser.firstName}`;
-    userImage.src = currentUser.imageUrl || "";
+    if (welcomeText) {
+      welcomeText.textContent = `Hello, ${currentUser.firstName}`;
+    }
+    if (userImage) {
+      userImage.src = currentUser.imageUrl || "";
+    }
   } catch (e) {
     console.error("Error parsing currentUser from sessionStorage", e);
     window.location.href = "login.html";
   }
 }
 
+// ---------- DOM elements ----------
 
-// elements for search & results
 const searchInput = document.getElementById("searchInput");
 const searchButton = document.getElementById("searchButton");
 const resultsContainer = document.getElementById("resultsContainer");
 
-// toast elements
+// toast
 const toast = document.getElementById("toast");
 const toastMessage = document.getElementById("toastMessage");
 const toastLink = document.getElementById("toastLink");
 let toastTimeoutId = null;
 
-function showToast(message) {
+// playlist chooser modal
+const playlistChooser = document.getElementById("playlistChooser");
+const playlistChooserList = document.getElementById("playlistChooserList");
+const playlistChooserNewName = document.getElementById("newPlaylistName");
+const playlistChooserCreateBtn = document.getElementById("createPlaylistBtn");
+const playlistChooserCloseBtn = document.getElementById("chooserClose");
+
+let videoToAdd = null; // הסרט שנוסיף כרגע
+
+// video modal (play)
+const modal = document.getElementById("videoModal");
+const modalTitle = document.getElementById("modalVideoTitle");
+const modalPlayer = document.getElementById("modalPlayer");
+const modalCloseBtn = document.querySelector(".modal-close");
+
+// ---------- Toast ----------
+
+function showToast(message, playlistName) {
   if (!toast || !toastMessage) return;
 
   toastMessage.textContent = message;
 
+  // אם רוצים – קישור לפלייליסט ספציפי
+  if (toastLink) {
+    if (playlistName) {
+      toastLink.href = `playlists.html?id=${encodeURIComponent(playlistName)}`;
+    } else {
+      toastLink.href = "playlists.html";
+    }
+  }
+
   toast.classList.remove("hidden");
   toast.classList.add("show");
 
-  // hide after 4 seconds
   if (toastTimeoutId) {
     clearTimeout(toastTimeoutId);
   }
@@ -55,9 +86,9 @@ function showToast(message) {
   }, 4000);
 }
 
+// ---------- YouTube helpers ----------
 
-// call YouTube Data API to search videos
-// helper
+// helper – convert ISO duration to "m:ss" / "h:mm:ss"
 function formatDuration(isoDuration) {
   if (!isoDuration) return "";
   const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -74,7 +105,7 @@ function formatDuration(isoDuration) {
   return `${minutes}:${pad(seconds)}`;
 }
 
-// helper - display views number
+// helper – nice views text
 function formatViews(countStr) {
   const count = Number(countStr || 0);
   if (count >= 1_000_000) {
@@ -86,9 +117,8 @@ function formatViews(countStr) {
   return count + " views";
 }
 
-// call YouTube Data API to search videos + bring duration and views
+// search + details (duration + views)
 async function searchYouTube(query) {
-  // bring only basic search - snippet
   const searchUrl = `${YOUTUBE_SEARCH_URL}?part=snippet&type=video&maxResults=10&q=${encodeURIComponent(
     query
   )}&key=${YOUTUBE_API_KEY}`;
@@ -100,12 +130,8 @@ async function searchYouTube(query) {
 
   const searchData = await searchResponse.json();
   const items = searchData.items || [];
+  if (items.length === 0) return [];
 
-  if (items.length === 0) {
-    return [];
-  }
-
-  // collect all the videoId for bring another details
   const videoIds = items
     .map((item) => item.id && item.id.videoId)
     .filter(Boolean);
@@ -117,7 +143,6 @@ async function searchYouTube(query) {
 
   const detailsResponse = await fetch(detailsUrl);
   if (!detailsResponse.ok) {
-    // if fail - return only the basic data
     console.warn("Failed to load video details", detailsResponse.status);
     return items;
   }
@@ -125,13 +150,11 @@ async function searchYouTube(query) {
   const detailsData = await detailsResponse.json();
   const detailsItems = detailsData.items || [];
 
-  // build map from videoId → details
   const detailsMap = {};
   detailsItems.forEach((d) => {
     detailsMap[d.id] = d;
   });
 
-  // connect the data to original videos
   items.forEach((item) => {
     const vid = item.id && item.id.videoId;
     const d = detailsMap[vid];
@@ -147,8 +170,185 @@ async function searchYouTube(query) {
   return items;
 }
 
+// ---------- Playlists storage (localStorage.playlists) ----------
+//
+// playlists = {
+//   "tamar": {
+//      "Favorites": [ { videoId, title, thumbnail, rating? }, ... ],
+//      "Driving": [...],
+//      ...
+//   },
+//   ...
+// }
 
-// render the videos as cards
+function getPlaylists() {
+  const json = localStorage.getItem("playlists");
+  if (!json) return {};
+  try {
+    return JSON.parse(json);
+  } catch {
+    return {};
+  }
+}
+
+function savePlaylists(playlists) {
+  localStorage.setItem("playlists", JSON.stringify(playlists));
+}
+
+function ensureUserDefaultPlaylists(username) {
+  const all = getPlaylists();
+
+  if (!all[username]) {
+    all[username] = {};
+  }
+  if (!all[username].Favorites) {
+    all[username].Favorites = [];
+  }
+
+  savePlaylists(all);
+}
+
+function getUserPlaylistsObject() {
+  if (!currentUser) return {};
+  const username = currentUser.username;
+
+  ensureUserDefaultPlaylists(username);
+
+  const all = getPlaylists();
+  return all[username] || {};
+}
+
+// האם סרטון נמצא *באחד הפלייליסטים* של המשתמש
+function isVideoInAnyPlaylist(videoId) {
+  if (!currentUser) return false;
+
+  const userPlaylists = getUserPlaylistsObject();
+  const playlistNames = Object.keys(userPlaylists);
+
+  for (const name of playlistNames) {
+    const list = userPlaylists[name] || [];
+    if (list.some((v) => v.videoId === videoId)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// הוספת סרטון לפלייליסט מסוים
+function addVideoToPlaylist(playlistName, video) {
+  if (!currentUser) return;
+
+  const username = currentUser.username;
+  const all = getPlaylists();
+
+  if (!all[username]) {
+    all[username] = {};
+  }
+  if (!all[username][playlistName]) {
+    all[username][playlistName] = [];
+  }
+
+  const list = all[username][playlistName];
+
+  const exists = list.some((v) => v.videoId === video.videoId);
+  if (exists) {
+    showToast("Video already exists in this playlist 🙂", playlistName);
+    return;
+  }
+
+  list.push(video);
+  all[username][playlistName] = list;
+  savePlaylists(all);
+
+  showToast(`Video added to "${playlistName}" playlist.`, playlistName);
+}
+
+// ---------- Playlist chooser modal ----------
+
+function openPlaylistChooser(video) {
+  if (!playlistChooser) return;
+  videoToAdd = video;
+
+  // למלא את הרשימה
+  fillPlaylistChooserList();
+
+  playlistChooser.style.display = "flex";
+}
+
+function closePlaylistChooser() {
+  if (!playlistChooser) return;
+  playlistChooser.style.display = "none";
+  videoToAdd = null;
+}
+
+function fillPlaylistChooserList() {
+  if (!playlistChooserList) return;
+  playlistChooserList.innerHTML = "";
+
+  const userPlaylists = getUserPlaylistsObject();
+  const playlistNames = Object.keys(userPlaylists);
+
+  if (playlistNames.length === 0) {
+    const p = document.createElement("p");
+    p.textContent = "No playlists yet. Create a new one below.";
+    playlistChooserList.appendChild(p);
+    return;
+  }
+
+  playlistNames.forEach((name) => {
+    const btn = document.createElement("button");
+    btn.textContent = name;
+    btn.addEventListener("click", () => {
+      if (!videoToAdd) return;
+      addVideoToPlaylist(name, videoToAdd);
+      closePlaylistChooser();
+    });
+    playlistChooserList.appendChild(btn);
+  });
+}
+
+// אירועים למודל הפלייליסט
+if (playlistChooserCloseBtn && playlistChooser) {
+  playlistChooserCloseBtn.addEventListener("click", closePlaylistChooser);
+
+  playlistChooser.addEventListener("click", (e) => {
+    if (e.target === playlistChooser) {
+      closePlaylistChooser();
+    }
+  });
+}
+
+if (playlistChooserCreateBtn && playlistChooserNewName) {
+  playlistChooserCreateBtn.addEventListener("click", () => {
+    const name = playlistChooserNewName.value.trim();
+    if (!name) return;
+
+    // ליצור/להבטיח פלייליסט ריק חדש
+    if (!currentUser) return;
+    const username = currentUser.username;
+    const all = getPlaylists();
+
+    if (!all[username]) {
+      all[username] = {};
+    }
+    if (!all[username][name]) {
+      all[username][name] = [];
+      savePlaylists(all);
+    }
+
+    playlistChooserNewName.value = "";
+    fillPlaylistChooserList();
+  });
+
+  playlistChooserNewName.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      playlistChooserCreateBtn.click();
+    }
+  });
+}
+
+// ---------- Render search results ----------
+
 function renderResults(items) {
   resultsContainer.innerHTML = "";
 
@@ -169,15 +369,13 @@ function renderResults(items) {
     img.src = thumbnail;
     img.alt = title;
 
-    // all the data text
     const infoDiv = document.createElement("div");
     infoDiv.className = "video-info";
 
     const h3 = document.createElement("h3");
     h3.textContent = title;
-    h3.title = title; // tooltip
+    h3.title = title;
 
-    // V duration + views
     const meta = document.createElement("div");
     meta.className = "video-meta";
 
@@ -190,14 +388,12 @@ function renderResults(items) {
     }
     meta.textContent = metaText;
 
-    // little V if already in favorites
     const favIndicator = document.createElement("span");
     favIndicator.className = "favorite-indicator";
     favIndicator.textContent = "✓";
     favIndicator.style.display = "none";
     h3.appendChild(favIndicator);
 
-    // V buttons
     const actionsDiv = document.createElement("div");
     actionsDiv.className = "video-actions";
 
@@ -205,39 +401,32 @@ function renderResults(items) {
     playBtn.textContent = "Play";
 
     const favBtn = document.createElement("button");
-    favBtn.textContent = "Add to favorites";
+    favBtn.textContent = "Add to playlist";
 
-    // check if already in favorites
-    const alreadyFavorite = isVideoInFavorites(videoId);
-    if (alreadyFavorite) {
-      favBtn.textContent = "In favorites ✓";
+    // לבדוק אם כבר באחד הפלייליסטים
+    const alreadyIn = isVideoInAnyPlaylist(videoId);
+    if (alreadyIn) {
+      favBtn.textContent = "In playlists ✓";
       favBtn.disabled = true;
       favBtn.classList.add("in-favorites");
       favIndicator.style.display = "inline";
     }
 
     favBtn.addEventListener("click", () => {
-      addToFavorites({
+      openPlaylistChooser({
         videoId,
         title,
-        thumbnail,
+        thumbnail
       });
 
-      // after the adding - lock the button if now in favorites
-      if (isVideoInFavorites(videoId)) {
-        favBtn.textContent = "In favorites ✓";
-        favBtn.disabled = true;
-        favBtn.classList.add("in-favorites");
-        favIndicator.style.display = "inline";
-      }
+      // אחרי שמוסיף – הבדיקה מתבצעת כשנחזור לחיפוש או נרנדר שוב;
+      // בכוונה לא נועלים מיד כדי לא לבלבל את המשתמש
     });
 
-    // all of these open the modal
     img.addEventListener("click", () => openModal(videoId, title));
     h3.addEventListener("click", () => openModal(videoId, title));
     playBtn.addEventListener("click", () => openModal(videoId, title));
 
-    // connecting all together
     actionsDiv.appendChild(playBtn);
     actionsDiv.appendChild(favBtn);
 
@@ -252,9 +441,8 @@ function renderResults(items) {
   });
 }
 
+// ---------- Query string helpers ----------
 
-
-// query string helpers
 function setSearchQueryParam(query) {
   const url = new URL(window.location.href);
 
@@ -264,7 +452,6 @@ function setSearchQueryParam(query) {
     url.searchParams.delete("q");
   }
 
-  // not reload the page, but only update the URL
   window.history.replaceState({}, "", url.toString());
 }
 
@@ -273,7 +460,8 @@ function getSearchQueryParam() {
   return url.searchParams.get("q") || "";
 }
 
-// search and display results
+// ---------- Search flow ----------
+
 async function performSearch(query) {
   resultsContainer.textContent = "Loading...";
 
@@ -286,81 +474,7 @@ async function performSearch(query) {
   }
 }
 
-// ---------- PLAYLIST / FAVORITES STORAGE ----------
-
-function getPlaylists() {
-  const json = localStorage.getItem("playlists");
-  if (!json) return {};
-  try {
-    return JSON.parse(json);
-  } catch {
-    return {};
-  }
-}
-
-function savePlaylists(playlists) {
-  localStorage.setItem("playlists", JSON.stringify(playlists));
-}
-
-// make sure that user + "Favorites" playlist exist
-function ensureUserFavorites(username) {
-  const all = getPlaylists();
-
-  if (!all[username]) {
-    all[username] = {};
-  }
-  if (!all[username].Favorites) {
-    all[username].Favorites = [];
-  }
-
-  savePlaylists(all);
-}
-
-// add video to current user's "Favorites" playlist
-function addToFavorites(video) {
-  const currentUser = JSON.parse(sessionStorage.getItem("currentUser"));
-  if (!currentUser) return;
-
-  const username = currentUser.username;
-
-  // make sure the structures exist
-  ensureUserFavorites(username);
-
-  const all = getPlaylists();
-  const favoritesList = all[username].Favorites || [];
-
-  // avoid duplicates
-  const exists = favoritesList.some((v) => v.videoId === video.videoId);
-  if (exists) {
-    showToast("This video is already in your favorites 🙂");
-    return;
-  }
-
-  favoritesList.push(video);
-  all[username].Favorites = favoritesList;
-  savePlaylists(all);
-
-  showToast("Video added to your Favorites playlist.");
-}
-
-// check if a video is already in current user's Favorites playlist
-function isVideoInFavorites(videoId) {
-  const currentUser = JSON.parse(sessionStorage.getItem("currentUser"));
-  if (!currentUser) return false;
-
-  const username = currentUser.username;
-  const all = getPlaylists();
-  const userPlaylists = all[username];
-  if (!userPlaylists || !userPlaylists.Favorites) return false;
-
-  return userPlaylists.Favorites.some((v) => v.videoId === videoId);
-}
-
-
-
-// search box logic
 if (searchInput && searchButton && resultsContainer) {
-  // search bottom
   searchButton.addEventListener("click", async function () {
     const query = searchInput.value.trim();
 
@@ -369,21 +483,16 @@ if (searchInput && searchButton && resultsContainer) {
       return;
     }
 
-    // update the query string
     setSearchQueryParam(query);
-
-    // doing search
     await performSearch(query);
   });
 
-  // search also with Enter
   searchInput.addEventListener("keydown", function (event) {
     if (event.key === "Enter") {
       searchButton.click();
     }
   });
 
-  // initial charge according to query string
   const initialQuery = getSearchQueryParam();
   if (initialQuery) {
     searchInput.value = initialQuery;
@@ -393,11 +502,7 @@ if (searchInput && searchButton && resultsContainer) {
   console.error("Search elements not found in the DOM");
 }
 
-// modal elements
-const modal = document.getElementById("videoModal");
-const modalTitle = document.getElementById("modalVideoTitle");
-const modalPlayer = document.getElementById("modalPlayer");
-const modalCloseBtn = document.querySelector(".modal-close");
+// ---------- Video modal ----------
 
 function openModal(videoId, title) {
   if (!modal) return;
@@ -409,20 +514,18 @@ function openModal(videoId, title) {
 function closeModal() {
   if (!modal) return;
   modal.style.display = "none";
-  modalPlayer.src = ""; // stop the play
+  modalPlayer.src = "";
 }
 
 if (modalCloseBtn && modal) {
   modalCloseBtn.addEventListener("click", closeModal);
 
-  // close with tap out the content
   modal.addEventListener("click", (event) => {
     if (event.target === modal) {
       closeModal();
     }
   });
 
-  // closing with ESC
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       closeModal();

@@ -16,18 +16,15 @@
   </header>
 
   <main class="playlists-layout">
-    <!-- סיידבר -->
+    <!-- sidebar -->
     <aside class="sidebar">
       <h2>My Library</h2>
       <button id="newPlaylistBtn">+ New playlist</button>
 
-      <ul id="playlistsList">
-        <!-- כרגע יש לנו רק רשימת Favorites אחת -->
-        <li class="playlist-item active" data-id="favorites">Favorites</li>
-      </ul>
+      <ul id="playlistsList"></ul>
     </aside>
 
-    <!-- אזור התוכן הראשי -->
+    <!-- main content -->
     <section class="playlist-content">
       <h2 id="currentPlaylistTitle">Favorites</h2>
 
@@ -45,12 +42,12 @@
       </div>
 
       <div id="playlistVideosContainer">
-        <!-- כאן יוצגו הסרטונים של הפלייליסט -->
+        <!-- here the playlist videos will display -->
       </div>
     </section>
   </main>
 
-  <!-- Video modal (כמו בדף החיפוש) -->
+  <!-- Video modal (like the sarch page) -->
   <div id="videoModal" class="modal">
     <div class="modal-content">
       <span class="modal-close">&times;</span>
