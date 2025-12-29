@@ -75,3 +75,42 @@ main {
 #resultsContainer {
   margin-top: 20px;
 }
+
+.modal {
+  display: none; /* נפתח ע"י JS */
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: #ffffff;
+  padding: 15px;
+  max-width: 800px;
+  width: 90%;
+  border-radius: 8px;
+}
+
+.modal-player-wrapper {
+  position: relative;
+  padding-bottom: 56.25%; /* 16:9 */
+  height: 0;
+}
+
+.modal-player-wrapper iframe {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+}
+
+.modal-close {
+  float: right;
+  font-size: 22px;
+  cursor: pointer;
+}
+

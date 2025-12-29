@@ -56,6 +56,17 @@ loginForm.addEventListener("submit", function (event) {
 
   sessionStorage.setItem("currentUser", JSON.stringify(currentUser));
 
-  alert("Login successful! Redirecting to search page...");
-  window.location.href = "search.html";
+  // check if we got here with returnUrl in the URL parameters
+  const url = new URL(window.location.href);
+  const returnUrl = url.searchParams.get("returnUrl");
+
+  alert("Login successful! Redirecting...");
+
+  if (returnUrl) {
+
+    window.location.href = decodeURIComponent(returnUrl);
+  } else {
+    // default – search.html
+    window.location.href = "search.html";
+  }
 });

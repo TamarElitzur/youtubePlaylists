@@ -1,12 +1,14 @@
 console.log("search.js loaded");
 
-// try to read the connected user's name from the sessionStorage
+const YOUTUBE_API_KEY = "AIzaSyDrdDlt3ePpPa8dJVoQdLlQYUTS5pExOkc";
+const YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search";
+
+// user info (Hello, name + image)
 const currentUserJson = sessionStorage.getItem("currentUser");
 
 if (!currentUserJson) {
-  // if there is not connected user, return to login page
-  alert("You must be logged in to use the search page.");
-  window.location.href = "login.html";
+  const returnUrl = encodeURIComponent(window.location.href);
+  window.location.href = `login.html?returnUrl=${returnUrl}`;
 } else {
   try {
     const currentUser = JSON.parse(currentUserJson);
@@ -14,10 +16,7 @@ if (!currentUserJson) {
     const welcomeText = document.getElementById("welcomeText");
     const userImage = document.getElementById("userImage");
 
-    // display hello msg + private name
     welcomeText.textContent = `Hello, ${currentUser.firstName}`;
-
-    // display picture
     userImage.src = currentUser.imageUrl || "";
   } catch (e) {
     console.error("Error parsing currentUser from sessionStorage", e);
@@ -25,13 +24,113 @@ if (!currentUserJson) {
   }
 }
 
-// search box logic
 
+// elements for search & results
 const searchInput = document.getElementById("searchInput");
 const searchButton = document.getElementById("searchButton");
+const resultsContainer = document.getElementById("resultsContainer");
 
-if (searchInput && searchButton) {
-  searchButton.addEventListener("click", function () {
+// call YouTube Data API to search videos
+async function searchYouTube(query) {
+  const url = `${YOUTUBE_SEARCH_URL}?part=snippet&type=video&maxResults=10&q=${encodeURIComponent(
+    query
+  )}&key=${YOUTUBE_API_KEY}`;
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("YouTube API request failed");
+  }
+
+  const data = await response.json();
+  return data.items; // array of videos
+}
+
+// render the videos as cards
+function renderResults(items) {
+  resultsContainer.innerHTML = "";
+
+  if (!items || items.length === 0) {
+    resultsContainer.textContent = "No results found.";
+    return;
+  }
+
+  items.forEach((item) => {
+    const videoId = item.id.videoId;
+    const title = item.snippet.title;
+    const thumbnail = item.snippet.thumbnails.medium.url;
+
+    const card = document.createElement("div");
+    card.className = "video-card";
+
+    const img = document.createElement("img");
+    img.src = thumbnail;
+    img.alt = title;
+
+    const h3 = document.createElement("h3");
+    h3.textContent = title;
+    h3.title = title; // tooltip
+
+    const playBtn = document.createElement("button");
+    playBtn.textContent = "Play";
+
+    const favBtn = document.createElement("button");
+    favBtn.textContent = "Add to favorites";
+    favBtn.addEventListener("click", () => {
+      alert("In the next step we'll save this to a playlist 🙂");
+    });
+
+    // all of these open the modal
+    img.addEventListener("click", () => openModal(videoId, title));
+    h3.addEventListener("click", () => openModal(videoId, title));
+    playBtn.addEventListener("click", () => openModal(videoId, title));
+
+    card.appendChild(img);
+    card.appendChild(h3);
+    card.appendChild(playBtn);
+    card.appendChild(favBtn);
+
+    resultsContainer.appendChild(card);
+  });
+}
+
+
+// query string helpers
+function setSearchQueryParam(query) {
+  const url = new URL(window.location.href);
+
+  if (query) {
+    url.searchParams.set("q", query);
+  } else {
+    url.searchParams.delete("q");
+  }
+
+  // not reload the page, but only update the URL
+  window.history.replaceState({}, "", url.toString());
+}
+
+function getSearchQueryParam() {
+  const url = new URL(window.location.href);
+  return url.searchParams.get("q") || "";
+}
+
+// search and display results
+async function performSearch(query) {
+  resultsContainer.textContent = "Loading...";
+
+  try {
+    const items = await searchYouTube(query);
+    renderResults(items);
+  } catch (err) {
+    console.error(err);
+    resultsContainer.textContent = "Error searching YouTube.";
+  }
+}
+
+// search box logic
+if (searchInput && searchButton && resultsContainer) {
+  // search bottom
+  searchButton.addEventListener("click", async function () {
     const query = searchInput.value.trim();
 
     if (!query) {
@@ -39,10 +138,63 @@ if (searchInput && searchButton) {
       return;
     }
 
-    console.log("User searched for:", query);
+    // update the query string
+    setSearchQueryParam(query);
 
-    // later we will call YouTube API here
+    // doing search
+    await performSearch(query);
   });
+
+  // search also with Enter
+  searchInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      searchButton.click();
+    }
+  });
+
+  // initial charge according to query string
+  const initialQuery = getSearchQueryParam();
+  if (initialQuery) {
+    searchInput.value = initialQuery;
+    performSearch(initialQuery);
+  }
 } else {
   console.error("Search elements not found in the DOM");
+}
+
+// modal elements
+const modal = document.getElementById("videoModal");
+const modalTitle = document.getElementById("modalVideoTitle");
+const modalPlayer = document.getElementById("modalPlayer");
+const modalCloseBtn = document.querySelector(".modal-close");
+
+function openModal(videoId, title) {
+  if (!modal) return;
+  modalTitle.textContent = title;
+  modalPlayer.src = `https://www.youtube.com/embed/${videoId}`;
+  modal.style.display = "flex";
+}
+
+function closeModal() {
+  if (!modal) return;
+  modal.style.display = "none";
+  modalPlayer.src = ""; // stop the play
+}
+
+if (modalCloseBtn && modal) {
+  modalCloseBtn.addEventListener("click", closeModal);
+
+  // close with tap out the content
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      closeModal();
+    }
+  });
+
+  // closing with ESC
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeModal();
+    }
+  });
 }
