@@ -114,3 +114,88 @@ main {
   cursor: pointer;
 }
 
+/* Playlists layout */
+
+.playlists-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  margin-top: 10px;
+}
+
+.sidebar {
+  width: 220px;
+  border-right: 1px solid #ccc;
+  padding-right: 15px;
+}
+
+.sidebar h2 {
+  margin-top: 0;
+}
+
+#newPlaylistBtn {
+  margin-bottom: 10px;
+}
+
+.playlist-item {
+  list-style: none;
+  padding: 6px 4px;
+  cursor: pointer;
+}
+
+.playlist-item.active {
+  font-weight: bold;
+  background-color: #f0f0f0;
+}
+
+.playlist-content {
+  flex: 1;
+}
+
+.playlist-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* video cards in search and in playlists */
+.video-card,
+.playlist-video-card {
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 10px;
+  max-width: 600px;
+}
+
+.video-card img,
+.playlist-video-card img {
+  width: 160px;
+  height: auto;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.video-info {
+  flex: 1;
+}
+
+.video-info h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.video-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.video-rating {
+  margin-top: 6px;
+  font-size: 14px;
+}
