@@ -1,6 +1,6 @@
 console.log("search.js loaded");
 
-const YOUTUBE_API_KEY = "AIzaSyDrdDlt3ePpPa8dJVoQdLlQYUTS5pExOkc";
+const YOUTUBE_API_KEY = "AIzaSyCzM8S4Q9h5vo-fyRIc55sdO1Xk3ikRYjI";
 const YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search";
 
 // user info (Hello, name + image)
