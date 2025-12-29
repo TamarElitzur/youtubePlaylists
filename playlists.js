@@ -23,9 +23,10 @@ if (!currentUserJson) {
   }
 }
 
-// --------- Favorites storage helpers (אותו פורמט כמו ב-search.js) ---------
-function getFavorites() {
-  const json = localStorage.getItem("favorites");
+// --------- Playlists / Favorites storage helpers ---------
+
+function getPlaylists() {
+  const json = localStorage.getItem("playlists");
   if (!json) return {};
   try {
     return JSON.parse(json);
@@ -34,15 +35,36 @@ function getFavorites() {
   }
 }
 
-function saveFavorites(favs) {
-  localStorage.setItem("favorites", JSON.stringify(favs));
+function savePlaylists(playlists) {
+  localStorage.setItem("playlists", JSON.stringify(playlists));
+}
+
+function ensureUserFavorites(username) {
+  const all = getPlaylists();
+
+  if (!all[username]) {
+    all[username] = {};
+  }
+  if (!all[username].Favorites) {
+    all[username].Favorites = [];
+  }
+
+  savePlaylists(all);
 }
 
 function getUserFavorites() {
-  const favorites = getFavorites();
   if (!currentUser) return [];
-  return favorites[currentUser.username] || [];
+
+  // make sure that the user always has favorites playlist
+  ensureUserFavorites(currentUser.username);
+
+  const all = getPlaylists();
+  const userPlaylists = all[currentUser.username];
+  if (!userPlaylists || !userPlaylists.Favorites) return [];
+
+  return userPlaylists.Favorites;
 }
+
 
 // --------- DOM elements ---------
 const playlistVideosContainer = document.getElementById("playlistVideosContainer");
@@ -97,27 +119,38 @@ if (modalCloseBtn && modal) {
 
 // Update rating & remove video
 function updateVideoRating(videoId, newRating) {
-  const favorites = getFavorites();
   if (!currentUser) return;
+
   const username = currentUser.username;
-  const list = favorites[username] || [];
+  const all = getPlaylists();
+  const userPlaylists = all[username];
+  if (!userPlaylists || !userPlaylists.Favorites) return;
+
+  const list = userPlaylists.Favorites;
   const video = list.find((v) => v.videoId === videoId);
   if (video) {
     video.rating = newRating;
-    favorites[username] = list;
-    saveFavorites(favorites);
+    all[username].Favorites = list;
+    savePlaylists(all);
+
+    baseVideos = getUserFavorites();
+    renderPlaylist();
   }
 }
 
-
 function removeVideo(videoId) {
-  const favorites = getFavorites();
   if (!currentUser) return;
+
   const username = currentUser.username;
-  let list = favorites[username] || [];
+  const all = getPlaylists();
+  const userPlaylists = all[username];
+  if (!userPlaylists || !userPlaylists.Favorites) return;
+
+  let list = userPlaylists.Favorites;
   list = list.filter((v) => v.videoId !== videoId);
-  favorites[username] = list;
-  saveFavorites(favorites);
+  all[username].Favorites = list;
+  savePlaylists(all);
+
   baseVideos = getUserFavorites();
   renderPlaylist();
 }

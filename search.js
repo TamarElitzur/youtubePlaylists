@@ -286,11 +286,10 @@ async function performSearch(query) {
   }
 }
 
-// ---------- FAVORITES STORAGE ----------
+// ---------- PLAYLIST / FAVORITES STORAGE ----------
 
-// read favorites object from localStorage
-function getFavorites() {
-  const json = localStorage.getItem("favorites");
+function getPlaylists() {
+  const json = localStorage.getItem("playlists");
   if (!json) return {};
   try {
     return JSON.parse(json);
@@ -299,50 +298,64 @@ function getFavorites() {
   }
 }
 
-// save favorites object to localStorage
-function saveFavorites(favs) {
-  localStorage.setItem("favorites", JSON.stringify(favs));
+function savePlaylists(playlists) {
+  localStorage.setItem("playlists", JSON.stringify(playlists));
 }
 
-// add video to current user's favorites
+// make sure that user + "Favorites" playlist exist
+function ensureUserFavorites(username) {
+  const all = getPlaylists();
+
+  if (!all[username]) {
+    all[username] = {};
+  }
+  if (!all[username].Favorites) {
+    all[username].Favorites = [];
+  }
+
+  savePlaylists(all);
+}
+
+// add video to current user's "Favorites" playlist
 function addToFavorites(video) {
   const currentUser = JSON.parse(sessionStorage.getItem("currentUser"));
   if (!currentUser) return;
 
   const username = currentUser.username;
 
-  const favorites = getFavorites();
+  // make sure the structures exist
+  ensureUserFavorites(username);
 
-  // if user has no list yet → create it
-  if (!favorites[username]) {
-    favorites[username] = [];
-  }
+  const all = getPlaylists();
+  const favoritesList = all[username].Favorites || [];
 
   // avoid duplicates
-  const exists = favorites[username].some(v => v.videoId === video.videoId);
+  const exists = favoritesList.some((v) => v.videoId === video.videoId);
   if (exists) {
-    alert("This video is already in your favorites 🙂");
+    showToast("This video is already in your favorites 🙂");
     return;
   }
 
-  favorites[username].push(video);
+  favoritesList.push(video);
+  all[username].Favorites = favoritesList;
+  savePlaylists(all);
 
-  saveFavorites(favorites);
-
-  showToast("Video added to your favorites playlist.");
+  showToast("Video added to your Favorites playlist.");
 }
 
-// check if a video is already in user's favorites
+// check if a video is already in current user's Favorites playlist
 function isVideoInFavorites(videoId) {
   const currentUser = JSON.parse(sessionStorage.getItem("currentUser"));
   if (!currentUser) return false;
 
   const username = currentUser.username;
-  const favorites = getFavorites();
-  const list = favorites[username] || [];
+  const all = getPlaylists();
+  const userPlaylists = all[username];
+  if (!userPlaylists || !userPlaylists.Favorites) return false;
 
-  return list.some((v) => v.videoId === videoId);
+  return userPlaylists.Favorites.some((v) => v.videoId === videoId);
 }
+
 
 
 // search box logic
