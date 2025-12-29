@@ -30,6 +30,7 @@ if (!currentUserJson) {
   }
 }
 
+
 // ---------- DOM elements ----------
 
 const searchInput = document.getElementById("searchInput");
@@ -171,15 +172,6 @@ async function searchYouTube(query) {
 }
 
 // ---------- Playlists storage (localStorage.playlists) ----------
-//
-// playlists = {
-//   "tamar": {
-//      "Favorites": [ { videoId, title, thumbnail, rating? }, ... ],
-//      "Driving": [...],
-//      ...
-//   },
-//   ...
-// }
 
 function getPlaylists() {
   const json = localStorage.getItem("playlists");
@@ -419,8 +411,8 @@ function renderResults(items) {
         thumbnail
       });
 
-      // אחרי שמוסיף – הבדיקה מתבצעת כשנחזור לחיפוש או נרנדר שוב;
-      // בכוונה לא נועלים מיד כדי לא לבלבל את המשתמש
+      // after it add, the check will happen when we get back to the search or render again
+      // not lock immidiatly for not confuse the user
     });
 
     img.addEventListener("click", () => openModal(videoId, title));
@@ -441,7 +433,7 @@ function renderResults(items) {
   });
 }
 
-// ---------- Query string helpers ----------
+// Query string helpers
 
 function setSearchQueryParam(query) {
   const url = new URL(window.location.href);
@@ -460,7 +452,7 @@ function getSearchQueryParam() {
   return url.searchParams.get("q") || "";
 }
 
-// ---------- Search flow ----------
+// Search flow
 
 async function performSearch(query) {
   resultsContainer.textContent = "Loading...";
@@ -502,7 +494,7 @@ if (searchInput && searchButton && resultsContainer) {
   console.error("Search elements not found in the DOM");
 }
 
-// ---------- Video modal ----------
+// Video modal
 
 function openModal(videoId, title) {
   if (!modal) return;
@@ -532,3 +524,13 @@ if (modalCloseBtn && modal) {
     }
   });
 }
+
+const logoutBtn = document.getElementById("logoutBtn");
+
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", () => {
+    sessionStorage.removeItem("currentUser");
+    window.location.href = "login.html";
+  });
+}
+

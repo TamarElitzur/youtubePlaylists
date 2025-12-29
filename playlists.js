@@ -1,6 +1,6 @@
 console.log("playlists.js loaded");
 
-// --------- user info (Hello, name + image) ---------
+// user info (Hello, name + image)
 const currentUserJson = sessionStorage.getItem("currentUser");
 
 let currentUser = null;
@@ -23,7 +23,7 @@ if (!currentUserJson) {
   }
 }
 
-// --------- Playlists / Favorites storage helpers ---------
+// Playlists / Favorites storage helpers
 
 function getPlaylists() {
   const json = localStorage.getItem("playlists");
@@ -66,7 +66,7 @@ function getUserFavorites() {
 }
 
 
-// --------- DOM elements ---------
+// DOM elements
 const playlistVideosContainer = document.getElementById("playlistVideosContainer");
 const playlistSearchInput = document.getElementById("playlistSearchInput");
 const playlistSearchButton = document.getElementById("playlistSearchButton");
@@ -76,15 +76,15 @@ const sortByRatingButton = document.getElementById("sortByRatingButton");
 const currentPlaylistTitle = document.getElementById("currentPlaylistTitle");
 const newPlaylistBtn = document.getElementById("newPlaylistBtn");
 
-// כרגע יש רק Favorites
+
 currentPlaylistTitle.textContent = "Favorites";
 
-// מצב פנימי
+// inner situation
 let baseVideos = getUserFavorites();
 let searchTerm = "";
 let sortMode = "none"; // "none" | "title" | "rating"
 
-// --------- Modal elements (כמו ב-search.js) ---------
+// Modal elements (like in- search.js)
 const modal = document.getElementById("videoModal");
 const modalTitle = document.getElementById("modalVideoTitle");
 const modalPlayer = document.getElementById("modalPlayer");
@@ -233,7 +233,7 @@ function renderPlaylist() {
       updateVideoRating(video.videoId, Number(ratingSelect.value));
     });
 
-    // events
+    // Events
     img.addEventListener("click", () =>
       openModal(video.videoId, video.title || "")
     );
@@ -306,6 +306,16 @@ if (newPlaylistBtn) {
     alert("In the next step we will support multiple playlists 🙂\nFor now you have a single Favorites playlist.");
   });
 }
+
+const logoutBtn = document.getElementById("logoutBtn");
+
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", () => {
+    sessionStorage.removeItem("currentUser");
+    window.location.href = "login.html";
+  });
+}
+
 
 // initial charge
 renderPlaylist();

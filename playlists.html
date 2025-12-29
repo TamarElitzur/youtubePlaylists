@@ -5,15 +5,39 @@
   <title>Playlists</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
-  <header>
-    <div class="top-bar">
-      <span id="welcomeText"></span>
-      <img id="userImage" alt="Profile image" />
-    </div>
 
-    <h1>My Playlists</h1>
+<head>
+  <meta charset="UTF-8" />
+  <title>Search</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+  <header class="main-header">
+    <div class="main-header-inner">
+      <div class="brand">
+        <span class="brand-logo">♫</span>
+        <span class="brand-title">My Playlists</span>
+      </div>
+
+      <nav class="main-nav">
+        <a href="search.html" class="nav-link">Search</a>
+        <a href="playlists.html" class="nav-link nav-link-active">Playlists</a>
+      </nav>
+
+      <div class="user-area">
+        <span id="welcomeText" class="welcome-text"></span>
+        <img id="userImage" alt="Profile image" class="user-avatar" />
+        <button id="logoutBtn" class="ghost-button">Logout</button>
+      </div>
+    </div>
   </header>
+
 
   <main class="playlists-layout">
     <!-- sidebar -->
