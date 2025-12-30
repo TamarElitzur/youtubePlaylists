@@ -226,7 +226,7 @@ function isVideoInAnyPlaylist(videoId) {
   return false;
 }
 
-// הוספת סרטון לפלייליסט מסוים
+// add video to specific playlist
 function addVideoToPlaylist(playlistName, video) {
   if (!currentUser) return;
 
@@ -242,26 +242,36 @@ function addVideoToPlaylist(playlistName, video) {
 
   const list = all[username][playlistName];
 
-  const exists = list.some((v) => v.videoId === video.videoId);
+  // from the object only the data that saved on localStorage
+  const { videoId, title, thumbnail, favBtn, favIndicator } = video;
+
+  const exists = list.some((v) => v.videoId === videoId);
   if (exists) {
     showToast("Video already exists in this playlist 🙂", playlistName);
-    return;
+  } else {
+    list.push({ videoId, title, thumbnail });
+    all[username][playlistName] = list;
+    savePlaylists(all);
+
+    showToast(`Video added to "${playlistName}" playlist.`, playlistName);
   }
 
-  list.push(video);
-  all[username][playlistName] = list;
-  savePlaylists(all);
-
-  showToast(`Video added to "${playlistName}" playlist.`, playlistName);
+  if (favBtn && favIndicator) {
+    favBtn.textContent = "In playlists ✓";
+    favBtn.disabled = true;
+    favBtn.classList.add("in-favorites");
+    favIndicator.style.display = "inline";
+  }
 }
 
-// ---------- Playlist chooser modal ----------
+
+// Playlist chooser modal 
 
 function openPlaylistChooser(video) {
   if (!playlistChooser) return;
   videoToAdd = video;
 
-  // למלא את הרשימה
+  // fill the list
   fillPlaylistChooserList();
 
   playlistChooser.style.display = "flex";
@@ -299,7 +309,7 @@ function fillPlaylistChooserList() {
   });
 }
 
-// אירועים למודל הפלייליסט
+// Event to the playlist modal
 if (playlistChooserCloseBtn && playlistChooser) {
   playlistChooserCloseBtn.addEventListener("click", closePlaylistChooser);
 
@@ -315,7 +325,7 @@ if (playlistChooserCreateBtn && playlistChooserNewName) {
     const name = playlistChooserNewName.value.trim();
     if (!name) return;
 
-    // ליצור/להבטיח פלייליסט ריק חדש
+    // create new empty playlist
     if (!currentUser) return;
     const username = currentUser.username;
     const all = getPlaylists();
@@ -339,7 +349,7 @@ if (playlistChooserCreateBtn && playlistChooserNewName) {
   });
 }
 
-// ---------- Render search results ----------
+// Render search results
 
 function renderResults(items) {
   resultsContainer.innerHTML = "";
@@ -395,7 +405,7 @@ function renderResults(items) {
     const favBtn = document.createElement("button");
     favBtn.textContent = "Add to playlist";
 
-    // לבדוק אם כבר באחד הפלייליסטים
+    // check if already in one of the playlists
     const alreadyIn = isVideoInAnyPlaylist(videoId);
     if (alreadyIn) {
       favBtn.textContent = "In playlists ✓";
@@ -408,12 +418,12 @@ function renderResults(items) {
       openPlaylistChooser({
         videoId,
         title,
-        thumbnail
+        thumbnail,
+        favBtn,
+        favIndicator
       });
-
-      // after it add, the check will happen when we get back to the search or render again
-      // not lock immidiatly for not confuse the user
     });
+
 
     img.addEventListener("click", () => openModal(videoId, title));
     h3.addEventListener("click", () => openModal(videoId, title));

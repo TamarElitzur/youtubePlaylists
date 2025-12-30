@@ -3,47 +3,196 @@
 <head>
   <meta charset="UTF-8" />
   <title>Register</title>
-  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Nice clean font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap"
+    rel="stylesheet"
+  />
+
+  <style>
+    /* Page background and centering */
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #f7f7fb, #eef1ff);
+      font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    /* Wrapper to keep card nicely centered on all widths */
+    .auth-page {
+      width: 100%;
+      max-width: 520px;
+      padding: 16px;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Main card */
+    .auth-card {
+      width: 100%;
+      max-width: 420px;
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 22px 60px rgba(15, 23, 42, 0.12);
+      padding: 28px 24px 24px;
+      box-sizing: border-box;
+    }
+
+    .auth-title {
+      margin: 0 0 6px;
+      text-align: center;
+      font-size: 24px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .auth-subtitle {
+      margin: 0 0 22px;
+      text-align: center;
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: #374151;
+    }
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 9px 11px;
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      background-color: #f9fafb;
+    }
+
+    input:focus {
+      border-color: #a855f7;
+      box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.18);
+      background-color: #ffffff;
+    }
+
+    /* Register button – soft, rounded, refined */
+    .primary-button {
+      width: 100%;
+      padding: 11px 14px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-top: 6px;
+      transition: transform 0.08s ease, box-shadow 0.12s ease,
+        background-position 0.15s ease;
+      background-size: 140% 140%;
+      background-position: 0% 50%;
+    }
+
+    .primary-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(148, 57, 178, 0.35);
+      background-position: 100% 50%;
+    }
+
+    .primary-button:active {
+      transform: translateY(0);
+      box-shadow: 0 5px 14px rgba(15, 23, 42, 0.25);
+    }
+
+    .auth-switch {
+      margin-top: 14px;
+      text-align: center;
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .auth-switch a {
+      color: #8b5cf6;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .auth-switch a:hover {
+      text-decoration: underline;
+    }
+
+    .error-messages {
+      margin-top: 8px;
+      min-height: 18px;
+      font-size: 13px;
+      color: #dc2626;
+      text-align: center;
+    }
+  </style>
 </head>
+
 <body>
-  <header>
-    <h1>Register</h1>
-  </header>
+  <div class="auth-page">
+    <div class="auth-card">
+      <h1 class="auth-title">Create account</h1>
+      <p class="auth-subtitle">Join and start building your playlists</p>
 
-  <main>
-    <form id="registerForm">
-      <div>
-        <label for="username">Username *</label>
-        <input type="text" id="username" required />
-      </div>
+      <form id="registerForm">
+        <div class="form-group">
+          <label for="firstName">First name</label>
+          <input id="firstName" type="text" />
+        </div>
 
-      <div>
-        <label for="password">Password *</label>
-        <input type="password" id="password" required />
-      </div>
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input id="username" type="text" />
+        </div>
 
-      <div>
-        <label for="confirmPassword">Confirm Password *</label>
-        <input type="password" id="confirmPassword" required />
-      </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input id="password" type="password" />
+        </div>
 
-      <div>
-        <label for="firstName">First Name *</label>
-        <input type="text" id="firstName" required />
-      </div>
+        <div class="form-group">
+          <label for="confirmPassword">Confirm password</label>
+          <input id="confirmPassword" type="password" />
+        </div>
 
-      <div>
-        <label for="imageUrl">Profile Image URL *</label>
-        <input type="url" id="imageUrl" required />
-      </div>
+        <div class="form-group">
+          <label for="imageUrl">Profile image URL</label>
+          <input id="imageUrl" type="url" />
+        </div>
 
-      <button type="submit">Register</button>
-    </form>
+        <button type="submit" id="registerBtn" class="primary-button">
+          Register
+        </button>
 
-    <div id="errorMessages" style="color:red; margin-top:10px;"></div>
+        <div id="registerErrorMessages" class="error-messages"></div>
+      </form>
 
-    <p>Already have an account? <a href="login.html">Login here</a></p>
-  </main>
+      <p class="auth-switch">
+        Already have an account?
+        <a href="login.html">Login</a>
+      </p>
+    </div>
+  </div>
 
   <script src="register.js"></script>
 </body>
