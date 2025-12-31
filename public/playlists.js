@@ -1,11 +1,12 @@
 console.log("playlists.js loaded");
 
-// ---------- current user from sessionStorage ----------
+// ----- Current user (from sessionStorage) -----
 
 const currentUserJson = sessionStorage.getItem("currentUser");
 let currentUser = null;
 
 if (!currentUserJson) {
+  // If no logged in user, redirect to login with returnUrl
   const returnUrl = encodeURIComponent(window.location.href);
   window.location.href = `login.html?returnUrl=${returnUrl}`;
 } else {
@@ -27,17 +28,15 @@ if (!currentUserJson) {
   }
 }
 
-// ---------- playlists data from server ----------
+// ----- In-memory playlists state -----
 
-let userPlaylists = {}; // object: { playlistName: [tracks...] }
+// Structure: { "Favorites": [ { videoId, title, thumbnail, rating, type, filePath }, ... ], ... }
+let userPlaylists = {};
 let currentPlaylistName = "Favorites";
-let searchTerm = "";
-let sortMode = "none"; // "none" | "title" | "rating"
 
-// DOM elements
-const playlistVideosContainer = document.getElementById(
-  "playlistVideosContainer"
-);
+// ----- DOM elements -----
+
+const playlistVideosContainer = document.getElementById("playlistVideosContainer");
 const playlistSearchInput = document.getElementById("playlistSearchInput");
 const playlistSearchButton = document.getElementById("playlistSearchButton");
 const clearSearchButton = document.getElementById("clearSearchButton");
@@ -47,10 +46,258 @@ const currentPlaylistTitle = document.getElementById("currentPlaylistTitle");
 const newPlaylistBtn = document.getElementById("newPlaylistBtn");
 const playlistsList = document.getElementById("playlistsList");
 
-const uploadMp3Form = document.getElementById("uploadMp3Form");
-const mp3FileInput = document.getElementById("mp3FileInput");
+// Internal UI state
+let searchTerm = "";
+let sortMode = "none"; // "none" | "title" | "rating"
 
-// Modal elements (YouTube videos only)
+// ----- Helpers for playlists -----
+
+function ensureFavoritesExists() {
+  if (!userPlaylists.Favorites) {
+    userPlaylists.Favorites = [];
+  }
+}
+
+/**
+ * Load all playlists for the current user from the server.
+ */
+async function loadUserPlaylistsFromServer() {
+  if (!currentUser) return;
+
+  try {
+    const res = await fetch(
+      `/api/playlists/${encodeURIComponent(currentUser.username)}`
+    );
+
+    if (!res.ok) {
+      console.error("Failed to load playlists from server", res.status);
+      userPlaylists = { Favorites: [] };
+      return;
+    }
+
+    const data = await res.json();
+    userPlaylists = data || {};
+    ensureFavoritesExists();
+  } catch (err) {
+    console.error("Error fetching playlists", err);
+    userPlaylists = { Favorites: [] };
+  }
+}
+
+/**
+ * Update rating in server (and then in memory).
+ */
+async function updateVideoRatingOnServer(playlistName, videoId, newRating) {
+  if (!currentUser) return;
+
+  try {
+    const res = await fetch(
+      `/api/playlists/${encodeURIComponent(currentUser.username)}/rating`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playlistName,
+          videoId,
+          rating: newRating,
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      console.error("Failed to update rating", res.status);
+      return;
+    }
+
+    // Update in-memory state
+    const list = userPlaylists[playlistName] || [];
+    const track = list.find((v) => v.videoId === videoId);
+    if (track) {
+      track.rating = newRating;
+    }
+  } catch (err) {
+    console.error("Error updating rating", err);
+  }
+}
+
+/**
+ * Remove video from playlist in server (and then locally).
+ */
+async function removeVideoFromServer(playlistName, videoId) {
+  if (!currentUser) return;
+
+  try {
+    const res = await fetch(
+      `/api/playlists/${encodeURIComponent(currentUser.username)}/remove`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playlistName,
+          videoId,
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      console.error("Failed to remove video", res.status);
+      return;
+    }
+
+    // Update in-memory state
+    const list = userPlaylists[playlistName] || [];
+    userPlaylists[playlistName] = list.filter((v) => v.videoId !== videoId);
+  } catch (err) {
+    console.error("Error removing video", err);
+  }
+}
+
+// ----- Rendering -----
+
+function renderSidebarPlaylists() {
+  if (!playlistsList) return;
+
+  playlistsList.innerHTML = "";
+
+  const names = Object.keys(userPlaylists);
+  names.forEach((name) => {
+    const li = document.createElement("li");
+    li.className = "playlist-item";
+    if (name === currentPlaylistName) {
+      li.classList.add("active");
+    }
+    li.textContent = name;
+    li.dataset.id = name;
+
+    li.addEventListener("click", () => {
+      currentPlaylistName = name;
+      currentPlaylistTitle.textContent = name;
+      renderSidebarPlaylists();
+      renderPlaylist();
+    });
+
+    playlistsList.appendChild(li);
+  });
+}
+
+/**
+ * Render the current playlist according to search + sort.
+ */
+function renderPlaylist() {
+  if (!playlistVideosContainer) return;
+
+  ensureFavoritesExists();
+
+  const baseList = userPlaylists[currentPlaylistName] || [];
+  let videos = [...baseList];
+
+  // Filter by search term
+  if (searchTerm) {
+    const lower = searchTerm.toLowerCase();
+    videos = videos.filter((v) =>
+      (v.title || "").toLowerCase().includes(lower)
+    );
+  }
+
+  // Sort
+  if (sortMode === "title") {
+    videos.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+  } else if (sortMode === "rating") {
+    videos.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  }
+
+  playlistVideosContainer.innerHTML = "";
+
+  if (videos.length === 0) {
+    playlistVideosContainer.textContent = "No videos in this playlist yet.";
+    return;
+  }
+
+  videos.forEach((video) => {
+    const card = document.createElement("div");
+    card.className = "playlist-video-card";
+
+    // For now, we treat both YouTube and MP3 entries similarly in UI.
+    // Later we can show <audio> for MP3 if needed.
+    const img = document.createElement("img");
+    img.src = video.thumbnail || "";
+    img.alt = video.title || "";
+
+    const infoDiv = document.createElement("div");
+    infoDiv.className = "video-info";
+
+    const titleEl = document.createElement("h3");
+    titleEl.textContent = video.title || "";
+    titleEl.title = video.title || "";
+
+    const actionsDiv = document.createElement("div");
+    actionsDiv.className = "video-actions";
+
+    const playBtn = document.createElement("button");
+    playBtn.textContent = "Play";
+
+    const removeBtn = document.createElement("button");
+    removeBtn.textContent = "Remove";
+
+    const ratingDiv = document.createElement("div");
+    ratingDiv.className = "video-rating";
+
+    const ratingLabel = document.createElement("span");
+    ratingLabel.textContent = "Rating: ";
+
+    const ratingSelect = document.createElement("select");
+    const currentRating = video.rating || 0;
+
+    for (let r = 0; r <= 5; r++) {
+      const opt = document.createElement("option");
+      opt.value = r;
+      opt.textContent = String(r);
+      if (r === currentRating) {
+        opt.selected = true;
+      }
+      ratingSelect.appendChild(opt);
+    }
+
+    ratingSelect.addEventListener("change", async () => {
+      const newRating = Number(ratingSelect.value);
+      await updateVideoRatingOnServer(currentPlaylistName, video.videoId, newRating);
+      renderPlaylist();
+    });
+
+    // Play button currently opens YouTube modal for YouTube entries.
+    // For MP3 we will later support audio element.
+    playBtn.addEventListener("click", () => {
+      if (video.type === "youtube" && video.videoId) {
+        openModal(video.videoId, video.title || "");
+      } else {
+        alert("Play for MP3 will be implemented later.");
+      }
+    });
+
+    removeBtn.addEventListener("click", async () => {
+      await removeVideoFromServer(currentPlaylistName, video.videoId);
+      renderPlaylist();
+    });
+
+    actionsDiv.appendChild(playBtn);
+    actionsDiv.appendChild(removeBtn);
+
+    ratingDiv.appendChild(ratingLabel);
+    ratingDiv.appendChild(ratingSelect);
+
+    infoDiv.appendChild(titleEl);
+    infoDiv.appendChild(actionsDiv);
+    infoDiv.appendChild(ratingDiv);
+
+    card.appendChild(img);
+    card.appendChild(infoDiv);
+
+    playlistVideosContainer.appendChild(card);
+  });
+}
+
+// ----- Modal for YouTube playback (same as search.js) -----
+
 const modal = document.getElementById("videoModal");
 const modalTitle = document.getElementById("modalVideoTitle");
 const modalPlayer = document.getElementById("modalPlayer");
@@ -83,267 +330,7 @@ if (modalCloseBtn && modal) {
   });
 }
 
-// ---------- API helpers ----------
-
-async function loadUserPlaylists() {
-  if (!currentUser) return;
-
-  try 
-  {
-    const res = await fetch(
-      `/api/playlists/${encodeURIComponent(currentUser.username)}`
-    );
-    if (!res.ok) {
-      console.error("Failed to load playlists from server", res.status);
-      userPlaylists = { Favorites: [] };
-      return;
-    }
-
-    const data = await res.json();
-    userPlaylists = data || {};
-
-    if (!userPlaylists.Favorites) {
-      userPlaylists.Favorites = [];
-    }
-  } catch (err) {
-    console.error("Error fetching playlists", err);
-    userPlaylists = { Favorites: [] };
-  }
-}
-
-async function updateVideoRatingOnServer(videoId, newRating) {
-  if (!currentUser) return;
-
-  try {
-    const res = await fetch(
-      `/api/playlists/${encodeURIComponent(currentUser.username)}/rating`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          playlistName: currentPlaylistName,
-          videoId,
-          rating: newRating,
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      console.error("Failed to update rating", res.status);
-    }
-  } catch (err) {
-    console.error("Error updating rating", err);
-  }
-}
-
-async function removeVideoOnServer(videoId) {
-  if (!currentUser) return;
-
-  try {
-    const res = await fetch(
-      `/api/playlists/${encodeURIComponent(currentUser.username)}/video`,
-      {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          playlistName: currentPlaylistName,
-          videoId,
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      console.error("Failed to remove video", res.status);
-    }
-  } catch (err) {
-    console.error("Error removing video", err);
-  }
-}
-
-// ---------- Render sidebar ----------
-
-function renderSidebarPlaylists() {
-  if (!playlistsList) return;
-
-  playlistsList.innerHTML = "";
-
-  const names = Object.keys(userPlaylists);
-  if (names.length === 0) {
-    names.push("Favorites");
-  }
-
-  names.forEach((name) => {
-    const li = document.createElement("li");
-    li.className = "playlist-item";
-    if (name === currentPlaylistName) {
-      li.classList.add("active");
-    }
-    li.textContent = name;
-    li.dataset.playlistName = name;
-
-    li.addEventListener("click", () => {
-      currentPlaylistName = name;
-      currentPlaylistTitle.textContent = name;
-      renderSidebarPlaylists();
-      renderPlaylist();
-    });
-
-    playlistsList.appendChild(li);
-  });
-}
-
-// ---------- Update rating & remove video (client + server) ----------
-
-async function updateVideoRating(videoId, newRating) {
-  if (!currentUser) return;
-
-  const list = userPlaylists[currentPlaylistName] || [];
-  const video = list.find((v) => v.videoId === videoId);
-  if (video) {
-    video.rating = newRating;
-  }
-
-  await updateVideoRatingOnServer(videoId, newRating);
-  renderPlaylist();
-}
-
-async function removeVideo(videoId) {
-  if (!currentUser) return;
-
-  let list = userPlaylists[currentPlaylistName] || [];
-  list = list.filter((v) => v.videoId !== videoId);
-  userPlaylists[currentPlaylistName] = list;
-
-  await removeVideoOnServer(videoId);
-  renderPlaylist();
-}
-
-// ---------- Render playlist ----------
-
-function renderPlaylist() {
-  if (!playlistVideosContainer) return;
-
-  const baseVideos = userPlaylists[currentPlaylistName] || [];
-  let videos = [...baseVideos];
-
-  // filter
-  if (searchTerm) {
-    const lower = searchTerm.toLowerCase();
-    videos = videos.filter((v) =>
-      (v.title || "").toLowerCase().includes(lower)
-    );
-  }
-
-  // sort
-  if (sortMode === "title") {
-    videos.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-  } else if (sortMode === "rating") {
-    videos.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-  }
-
-  playlistVideosContainer.innerHTML = "";
-
-  if (videos.length === 0) {
-    playlistVideosContainer.textContent = "No videos in this playlist yet.";
-    return;
-  }
-
-  videos.forEach((video) => {
-    const isMp3 = video.type === "mp3";
-
-    const card = document.createElement("div");
-    card.className = "playlist-video-card";
-
-    // For YouTube videos – show thumbnail
-    if (!isMp3) {
-      const img = document.createElement("img");
-      img.src = video.thumbnail || "";
-      img.alt = video.title || "";
-      img.addEventListener("click", () =>
-        openModal(video.videoId, video.title || "")
-      );
-      card.appendChild(img);
-    }
-
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "video-info";
-
-    const titleEl = document.createElement("h3");
-    titleEl.textContent = video.title || "";
-    titleEl.title = video.title || "";
-
-    if (!isMp3) {
-      titleEl.addEventListener("click", () =>
-        openModal(video.videoId, video.title || "")
-      );
-    }
-
-    const actionsDiv = document.createElement("div");
-    actionsDiv.className = "video-actions";
-
-    const playBtn = document.createElement("button");
-    playBtn.textContent = isMp3 ? "Play (audio below)" : "Play";
-
-    const removeBtn = document.createElement("button");
-    removeBtn.textContent = "Remove";
-
-    if (!isMp3) {
-      playBtn.addEventListener("click", () =>
-        openModal(video.videoId, video.title || "")
-      );
-    }
-
-    removeBtn.addEventListener("click", () => removeVideo(video.videoId));
-
-    actionsDiv.appendChild(playBtn);
-    actionsDiv.appendChild(removeBtn);
-
-    const ratingDiv = document.createElement("div");
-    ratingDiv.className = "video-rating";
-
-    const ratingLabel = document.createElement("span");
-    ratingLabel.textContent = "Rating: ";
-
-    const ratingSelect = document.createElement("select");
-    const currentRating = video.rating || 0;
-
-    for (let r = 0; r <= 5; r++) {
-      const opt = document.createElement("option");
-      opt.value = r;
-      opt.textContent = String(r);
-      if (r === currentRating) {
-        opt.selected = true;
-      }
-      ratingSelect.appendChild(opt);
-    }
-
-    ratingSelect.addEventListener("change", () => {
-      updateVideoRating(video.videoId, Number(ratingSelect.value));
-    });
-
-    ratingDiv.appendChild(ratingLabel);
-    ratingDiv.appendChild(ratingSelect);
-
-    infoDiv.appendChild(titleEl);
-    infoDiv.appendChild(actionsDiv);
-    infoDiv.appendChild(ratingDiv);
-
-    card.appendChild(infoDiv);
-
-    // For MP3 tracks – add <audio> player
-    if (isMp3 && video.filePath) {
-      const audio = document.createElement("audio");
-      audio.controls = true;
-      audio.src = video.filePath;
-      audio.style.marginTop = "8px";
-      card.appendChild(audio);
-    }
-
-    playlistVideosContainer.appendChild(card);
-  });
-}
-
-// ---------- Controls events ----------
+// ----- Controls events -----
 
 if (playlistSearchButton && playlistSearchInput) {
   playlistSearchButton.addEventListener("click", () => {
@@ -362,7 +349,9 @@ if (playlistSearchButton && playlistSearchInput) {
 if (clearSearchButton) {
   clearSearchButton.addEventListener("click", () => {
     searchTerm = "";
-    playlistSearchInput.value = "";
+    if (playlistSearchInput) {
+      playlistSearchInput.value = "";
+    }
     renderPlaylist();
   });
 }
@@ -383,16 +372,27 @@ if (sortByRatingButton) {
 
 if (newPlaylistBtn) {
   newPlaylistBtn.addEventListener("click", () => {
-    alert(
-      "Multiple playlists UI is limited – for now Favorites is the main one.\n(Backend supports multiple playlists though 🙂)"
-    );
+    const name = prompt("Enter new playlist name:");
+    if (!name) return;
+
+    if (!userPlaylists[name]) {
+      userPlaylists[name] = [];
+      currentPlaylistName = name;
+      currentPlaylistTitle.textContent = name;
+      renderSidebarPlaylists();
+      renderPlaylist();
+    } else {
+      alert("A playlist with this name already exists.");
+    }
   });
 }
 
+// ----- Logout button -----
+
 const logoutBtn = document.getElementById("logoutBtn");
+
 if (logoutBtn) {
   logoutBtn.addEventListener("click", async () => {
-    // אופציונלי לקרוא גם לשרת:
     try {
       await fetch("/api/logout", { method: "POST" });
     } catch (e) {
@@ -403,65 +403,15 @@ if (logoutBtn) {
   });
 }
 
-// ---------- MP3 upload handling ----------
-
-if (uploadMp3Form && mp3FileInput) {
-  uploadMp3Form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if (!currentUser) return;
-
-    const file = mp3FileInput.files[0];
-    if (!file) {
-      alert("Please choose an MP3 file first.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("playlistName", currentPlaylistName);
-    formData.append("title", file.name);
-
-    try {
-      const res = await fetch(
-        `/api/upload-mp3/${encodeURIComponent(currentUser.username)}`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        const errMsg =
-          data && data.error
-            ? data.error
-            : "Error uploading MP3. Please try again.";
-        alert(errMsg);
-        return;
-      }
-
-      const track = data.track;
-      if (!userPlaylists[currentPlaylistName]) {
-        userPlaylists[currentPlaylistName] = [];
-      }
-      userPlaylists[currentPlaylistName].push(track);
-
-      mp3FileInput.value = "";
-      renderPlaylist();
-      alert("MP3 uploaded and added to playlist!");
-    } catch (err) {
-      console.error("Error uploading MP3", err);
-      alert("Network error during MP3 upload.");
-    }
-  });
-}
-
-// ---------- init ----------
+// ----- Initialization -----
 
 (async function init() {
+  if (!currentUser) return;
+
+  await loadUserPlaylistsFromServer();
+  ensureFavoritesExists();
+
   currentPlaylistTitle.textContent = currentPlaylistName;
-  await loadUserPlaylists();
   renderSidebarPlaylists();
   renderPlaylist();
 })();

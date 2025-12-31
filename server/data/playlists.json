@@ -1,5 +1,25 @@
 {
   "TamarElitzur": {
     "Favorites": []
+  },
+  "TamarElitzu": {
+    "Favorites": [
+      {
+        "videoId": "C-u5WLJ9Yk4",
+        "title": "Britney Spears - ...Baby One More Time (Official Video)",
+        "thumbnail": "https://i.ytimg.com/vi/C-u5WLJ9Yk4/mqdefault.jpg",
+        "rating": 0,
+        "type": "youtube",
+        "filePath": null
+      },
+      {
+        "videoId": "CduA0TULnow",
+        "title": "Britney Spears - Oops!...I Did It Again (Official HD Video)",
+        "thumbnail": "https://i.ytimg.com/vi/CduA0TULnow/mqdefault.jpg",
+        "rating": 0,
+        "type": "youtube",
+        "filePath": null
+      }
+    ]
   }
 }
