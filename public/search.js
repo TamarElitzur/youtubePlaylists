@@ -30,7 +30,6 @@ if (!currentUserJson) {
   }
 }
 
-
 // ---------- DOM elements ----------
 
 const searchInput = document.getElementById("searchInput");
@@ -50,7 +49,7 @@ const playlistChooserNewName = document.getElementById("newPlaylistName");
 const playlistChooserCreateBtn = document.getElementById("createPlaylistBtn");
 const playlistChooserCloseBtn = document.getElementById("chooserClose");
 
-let videoToAdd = null; // הסרט שנוסיף כרגע
+let videoToAdd = null; // הסרטון שנוסיף כרגע
 
 // video modal (play)
 const modal = document.getElementById("videoModal");
@@ -65,7 +64,6 @@ function showToast(message, playlistName) {
 
   toastMessage.textContent = message;
 
-  // אם רוצים – קישור לפלייליסט ספציפי
   if (toastLink) {
     if (playlistName) {
       toastLink.href = `playlists.html?id=${encodeURIComponent(playlistName)}`;
@@ -89,7 +87,6 @@ function showToast(message, playlistName) {
 
 // ---------- YouTube helpers ----------
 
-// helper – convert ISO duration to "m:ss" / "h:mm:ss"
 function formatDuration(isoDuration) {
   if (!isoDuration) return "";
   const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -106,7 +103,6 @@ function formatDuration(isoDuration) {
   return `${minutes}:${pad(seconds)}`;
 }
 
-// helper – nice views text
 function formatViews(countStr) {
   const count = Number(countStr || 0);
   if (count >= 1_000_000) {
@@ -118,7 +114,6 @@ function formatViews(countStr) {
   return count + " views";
 }
 
-// search + details (duration + views)
 async function searchYouTube(query) {
   const searchUrl = `${YOUTUBE_SEARCH_URL}?part=snippet&type=video&maxResults=10&q=${encodeURIComponent(
     query
@@ -171,53 +166,49 @@ async function searchYouTube(query) {
   return items;
 }
 
-// ---------- Playlists storage (localStorage.playlists) ----------
+// ---------- Playlists (from server, not localStorage) ----------
+//
+// מבנה בצד שרת:
+// {
+//   "username": {
+//      "Favorites": [ { videoId, title, thumbnail, rating, type, filePath }, ... ],
+//      "My Playlist": [ ... ]
+//   }
+// }
 
-function getPlaylists() {
-  const json = localStorage.getItem("playlists");
-  if (!json) return {};
+let userPlaylists = {}; // { playlistName: [tracks...] }
+
+// טוען את הפלייליסטים מהשרת
+async function loadUserPlaylists() {
+  if (!currentUser) return;
+
   try {
-    return JSON.parse(json);
-  } catch {
-    return {};
+    const res = await fetch(
+      `/api/playlists/${encodeURIComponent(currentUser.username)}`
+    );
+    if (!res.ok) {
+      console.error("Failed to load playlists from server", res.status);
+      userPlaylists = { Favorites: [] };
+      return;
+    }
+
+    const data = await res.json();
+    userPlaylists = data || {};
+    if (!userPlaylists.Favorites) {
+      userPlaylists.Favorites = [];
+    }
+  } catch (err) {
+    console.error("Error fetching playlists", err);
+    userPlaylists = { Favorites: [] };
   }
 }
 
-function savePlaylists(playlists) {
-  localStorage.setItem("playlists", JSON.stringify(playlists));
-}
-
-function ensureUserDefaultPlaylists(username) {
-  const all = getPlaylists();
-
-  if (!all[username]) {
-    all[username] = {};
-  }
-  if (!all[username].Favorites) {
-    all[username].Favorites = [];
-  }
-
-  savePlaylists(all);
-}
-
-function getUserPlaylistsObject() {
-  if (!currentUser) return {};
-  const username = currentUser.username;
-
-  ensureUserDefaultPlaylists(username);
-
-  const all = getPlaylists();
-  return all[username] || {};
-}
-
-// האם סרטון נמצא *באחד הפלייליסטים* של המשתמש
+// האם הסרטון קיים באחד הפלייליסטים של המשתמש (בזיכרון)
 function isVideoInAnyPlaylist(videoId) {
   if (!currentUser) return false;
 
-  const userPlaylists = getUserPlaylistsObject();
-  const playlistNames = Object.keys(userPlaylists);
-
-  for (const name of playlistNames) {
+  const names = Object.keys(userPlaylists || {});
+  for (const name of names) {
     const list = userPlaylists[name] || [];
     if (list.some((v) => v.videoId === videoId)) {
       return true;
@@ -226,54 +217,82 @@ function isVideoInAnyPlaylist(videoId) {
   return false;
 }
 
-// add video to specific playlist
-function addVideoToPlaylist(playlistName, video) {
+// מוסיף סרטון לפלייליסט (שרת + עדכון זיכרון + UI)
+async function addVideoToPlaylist(playlistName, video) {
   if (!currentUser) return;
 
   const username = currentUser.username;
-  const all = getPlaylists();
 
-  if (!all[username]) {
-    all[username] = {};
-  }
-  if (!all[username][playlistName]) {
-    all[username][playlistName] = [];
-  }
+  try {
+    const res = await fetch(
+      `/api/playlists/${encodeURIComponent(username)}/add`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playlistName,
+          video: {
+            videoId: video.videoId,
+            title: video.title,
+            thumbnail: video.thumbnail,
+            rating: 0,
+            type: "youtube",
+          },
+        }),
+      }
+    );
 
-  const list = all[username][playlistName];
+    const data = await res.json().catch(() => ({}));
 
-  // from the object only the data that saved on localStorage
-  const { videoId, title, thumbnail, favBtn, favIndicator } = video;
+    if (res.status === 409) {
+      // already exists
+      showToast("Video already exists in this playlist 🙂", playlistName);
+    } else if (!res.ok) {
+      const errMsg =
+        data && data.error
+          ? data.error
+          : "Error adding video to playlist. Please try again.";
+      alert(errMsg);
+      return;
+    } else {
+      // success – נעדכן גם את הזיכרון
+      if (!userPlaylists[playlistName]) {
+        userPlaylists[playlistName] = [];
+      }
 
-  const exists = list.some((v) => v.videoId === videoId);
-  if (exists) {
-    showToast("Video already exists in this playlist 🙂", playlistName);
-  } else {
-    list.push({ videoId, title, thumbnail });
-    all[username][playlistName] = list;
-    savePlaylists(all);
+      const track = {
+        videoId: video.videoId,
+        title: video.title,
+        thumbnail: video.thumbnail,
+        rating: 0,
+        type: "youtube",
+      };
 
-    showToast(`Video added to "${playlistName}" playlist.`, playlistName);
-  }
+      userPlaylists[playlistName].push(track);
 
-  if (favBtn && favIndicator) {
-    favBtn.textContent = "In playlists ✓";
-    favBtn.disabled = true;
-    favBtn.classList.add("in-favorites");
-    favIndicator.style.display = "inline";
+      showToast(`Video added to "${playlistName}" playlist.`, playlistName);
+    }
+
+    // עדכון הכפתור וה-V
+    if (video.favBtn && video.favIndicator) {
+      video.favBtn.textContent = "In playlists ✓";
+      video.favBtn.disabled = true;
+      video.favBtn.classList.add("in-favorites");
+      video.favIndicator.style.display = "inline";
+    }
+  } catch (err) {
+    console.error("Error adding video to playlist", err);
+    alert("Network error. Please try again.");
   }
 }
 
-
-// Playlist chooser modal 
+// ---------- Playlist chooser modal ----------
 
 function openPlaylistChooser(video) {
   if (!playlistChooser) return;
   videoToAdd = video;
 
-  // fill the list
   fillPlaylistChooserList();
-
   playlistChooser.style.display = "flex";
 }
 
@@ -287,17 +306,15 @@ function fillPlaylistChooserList() {
   if (!playlistChooserList) return;
   playlistChooserList.innerHTML = "";
 
-  const userPlaylists = getUserPlaylistsObject();
-  const playlistNames = Object.keys(userPlaylists);
-
-  if (playlistNames.length === 0) {
+  const names = Object.keys(userPlaylists || {});
+  if (names.length === 0) {
     const p = document.createElement("p");
     p.textContent = "No playlists yet. Create a new one below.";
     playlistChooserList.appendChild(p);
     return;
   }
 
-  playlistNames.forEach((name) => {
+  names.forEach((name) => {
     const btn = document.createElement("button");
     btn.textContent = name;
     btn.addEventListener("click", () => {
@@ -309,7 +326,6 @@ function fillPlaylistChooserList() {
   });
 }
 
-// Event to the playlist modal
 if (playlistChooserCloseBtn && playlistChooser) {
   playlistChooserCloseBtn.addEventListener("click", closePlaylistChooser);
 
@@ -325,17 +341,10 @@ if (playlistChooserCreateBtn && playlistChooserNewName) {
     const name = playlistChooserNewName.value.trim();
     if (!name) return;
 
-    // create new empty playlist
-    if (!currentUser) return;
-    const username = currentUser.username;
-    const all = getPlaylists();
-
-    if (!all[username]) {
-      all[username] = {};
-    }
-    if (!all[username][name]) {
-      all[username][name] = [];
-      savePlaylists(all);
+    // יוצרים פלייליסט בזיכרון (יופיע ברשימה).
+    // הוא יישמר בשרת ברגע שנוסיף אליו שיר.
+    if (!userPlaylists[name]) {
+      userPlaylists[name] = [];
     }
 
     playlistChooserNewName.value = "";
@@ -349,7 +358,38 @@ if (playlistChooserCreateBtn && playlistChooserNewName) {
   });
 }
 
-// Render search results
+// ---------- Video modal ----------
+
+function openModal(videoId, title) {
+  if (!modal) return;
+  modalTitle.textContent = title;
+  modalPlayer.src = `https://www.youtube.com/embed/${videoId}`;
+  modal.style.display = "flex";
+}
+
+function closeModal() {
+  if (!modal) return;
+  modal.style.display = "none";
+  modalPlayer.src = "";
+}
+
+if (modalCloseBtn && modal) {
+  modalCloseBtn.addEventListener("click", closeModal);
+
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      closeModal();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeModal();
+    }
+  });
+}
+
+// ---------- Render search results ----------
 
 function renderResults(items) {
   resultsContainer.innerHTML = "";
@@ -420,10 +460,9 @@ function renderResults(items) {
         title,
         thumbnail,
         favBtn,
-        favIndicator
+        favIndicator,
       });
     });
-
 
     img.addEventListener("click", () => openModal(videoId, title));
     h3.addEventListener("click", () => openModal(videoId, title));
@@ -443,7 +482,7 @@ function renderResults(items) {
   });
 }
 
-// Query string helpers
+// ---------- Query string helpers ----------
 
 function setSearchQueryParam(query) {
   const url = new URL(window.location.href);
@@ -462,7 +501,7 @@ function getSearchQueryParam() {
   return url.searchParams.get("q") || "";
 }
 
-// Search flow
+// ---------- Search flow ----------
 
 async function performSearch(query) {
   resultsContainer.textContent = "Loading...";
@@ -504,43 +543,26 @@ if (searchInput && searchButton && resultsContainer) {
   console.error("Search elements not found in the DOM");
 }
 
-// Video modal
-
-function openModal(videoId, title) {
-  if (!modal) return;
-  modalTitle.textContent = title;
-  modalPlayer.src = `https://www.youtube.com/embed/${videoId}`;
-  modal.style.display = "flex";
-}
-
-function closeModal() {
-  if (!modal) return;
-  modal.style.display = "none";
-  modalPlayer.src = "";
-}
-
-if (modalCloseBtn && modal) {
-  modalCloseBtn.addEventListener("click", closeModal);
-
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      closeModal();
-    }
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      closeModal();
-    }
-  });
-}
+// ---------- Logout ----------
 
 const logoutBtn = document.getElementById("logoutBtn");
 
 if (logoutBtn) {
-  logoutBtn.addEventListener("click", () => {
+  logoutBtn.addEventListener("click", async () => {
+    try {
+      await fetch("/api/logout", { method: "POST" });
+    } catch (e) {
+      console.warn("Logout request failed (ignored).");
+    }
     sessionStorage.removeItem("currentUser");
     window.location.href = "login.html";
   });
 }
 
+// ---------- Init: load playlists once for the "already in playlist" check ----------
+
+(async function init() {
+  if (currentUser) {
+    await loadUserPlaylists();
+  }
+})();
