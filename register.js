@@ -2,7 +2,7 @@
 console.log("register.js loaded");
 
 const registerForm = document.getElementById("registerForm");
-const errorDiv = document.getElementById("errorMessages");
+const errorDiv = document.getElementById("registerErrorMessages");
 
 // localStorage- return the users list
 function getUsers() {
