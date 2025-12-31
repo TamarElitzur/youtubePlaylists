@@ -1,6 +1,15 @@
 {
   "TamarElitzur": {
-    "Favorites": []
+    "Favorites": [
+      {
+        "videoId": "xFrGuyw1V8s",
+        "title": "ABBA - Dancing Queen (Official Music Video)",
+        "thumbnail": "https://i.ytimg.com/vi/xFrGuyw1V8s/mqdefault.jpg",
+        "rating": 0,
+        "type": "youtube",
+        "filePath": null
+      }
+    ]
   },
   "TamarElitzu": {
     "Favorites": [
