@@ -246,14 +246,16 @@ function renderSidebarPlaylists() {
  * Render the current playlist according to search + sort.
  */
 function renderPlaylist() {
-  if (!playlistVideosContainer) return;
+  // Make sure we have playlists data for the current user
+  if (!userPlaylists || !userPlaylists[currentPlaylistName]) {
+    playlistVideosContainer.innerHTML = "No videos in this playlist yet.";
+    return;
+  }
 
-  ensureFavoritesExists();
+  // Start with raw list from server / state
+  let videos = [...userPlaylists[currentPlaylistName]];
 
-  const baseList = userPlaylists[currentPlaylistName] || [];
-  let videos = [...baseList];
-
-  // Filter by search term
+  // Filter by inner search
   if (searchTerm) {
     const lower = searchTerm.toLowerCase();
     videos = videos.filter((v) =>
@@ -265,23 +267,27 @@ function renderPlaylist() {
   if (sortMode === "title") {
     videos.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
   } else if (sortMode === "rating") {
-    videos.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    videos.sort(
+      (a, b) => (b.rating || 0) - (a.rating || 0)
+    );
   }
 
   playlistVideosContainer.innerHTML = "";
 
   if (videos.length === 0) {
-    playlistVideosContainer.textContent = "No videos in this playlist yet.";
+    playlistVideosContainer.textContent =
+      "No videos in this playlist yet.";
     return;
   }
 
   videos.forEach((video) => {
+    const isMp3 = video.type === "mp3";
+
     const card = document.createElement("div");
     card.className = "playlist-video-card";
 
-    // For now, we treat both YouTube and MP3 entries similarly in UI.
-    // Later we can show <audio> for MP3 if needed.
     const img = document.createElement("img");
+    // For MP3 we may not have thumbnail, so this can be empty
     img.src = video.thumbnail || "";
     img.alt = video.title || "";
 
@@ -304,15 +310,6 @@ function renderPlaylist() {
     const ratingDiv = document.createElement("div");
     ratingDiv.className = "video-rating";
 
-    let audioEl = null;
-    if (video.type === "mp3" && video.filePath) {
-      audioEl = document.createElement("audio");
-      audioEl.controls = true;
-      audioEl.src = video.filePath;
-      audioEl.style.marginTop = "6px";
-    }
-
-
     const ratingLabel = document.createElement("span");
     ratingLabel.textContent = "Rating: ";
 
@@ -329,28 +326,52 @@ function renderPlaylist() {
       ratingSelect.appendChild(opt);
     }
 
-    ratingSelect.addEventListener("change", async () => {
-      const newRating = Number(ratingSelect.value);
-      await updateVideoRatingOnServer(currentPlaylistName, video.videoId, newRating);
-      renderPlaylist();
-    });
-
-    // Play button currently opens YouTube modal for YouTube entries.
-    // For MP3 we will later support audio element.
-    playBtn.addEventListener("click", () => {
-      if (video.type === "youtube" && video.videoId) {
-        openModal(video.videoId, video.title || "");
-      } else if (video.type === "mp3" && audioEl) {
-        audioEl.play().catch(() => {});
-      } else {
-        alert("Cannot play this item.");
+    ratingSelect.addEventListener("change", () => {
+      updateVideoRatingOnServer(video.videoId, Number(ratingSelect.value));
+      // Also update local state
+      const list = userPlaylists[currentPlaylistName] || [];
+      const track = list.find((v) => v.videoId === video.videoId);
+      if (track) {
+        track.rating = Number(ratingSelect.value);
       }
     });
 
+    // Optional audio element for MP3 tracks
+    let audioEl = null;
+    if (isMp3 && video.filePath) {
+      audioEl = document.createElement("audio");
+      audioEl.controls = true;
+      audioEl.src = video.filePath;
+      audioEl.style.marginTop = "6px";
+    }
 
-    removeBtn.addEventListener("click", async () => {
-      await removeVideoFromServer(currentPlaylistName, video.videoId);
-      renderPlaylist();
+    // Events
+    img.addEventListener("click", () => {
+      if (isMp3 && audioEl) {
+        audioEl.play().catch(() => {});
+      } else {
+        openModal(video.videoId, video.title || "");
+      }
+    });
+
+    titleEl.addEventListener("click", () => {
+      if (isMp3 && audioEl) {
+        audioEl.play().catch(() => {});
+      } else {
+        openModal(video.videoId, video.title || "");
+      }
+    });
+
+    playBtn.addEventListener("click", () => {
+      if (isMp3 && audioEl) {
+        audioEl.play().catch(() => {});
+      } else {
+        openModal(video.videoId, video.title || "");
+      }
+    });
+
+    removeBtn.addEventListener("click", () => {
+      removeVideoFromServer(video.videoId);
     });
 
     actionsDiv.appendChild(playBtn);
@@ -363,17 +384,17 @@ function renderPlaylist() {
     infoDiv.appendChild(actionsDiv);
     infoDiv.appendChild(ratingDiv);
 
-    card.appendChild(img);
-    card.appendChild(infoDiv);
-
     if (audioEl) {
-    infoDiv.appendChild(audioEl);
+      infoDiv.appendChild(audioEl);
     }
 
+    card.appendChild(img);
+    card.appendChild(infoDiv);
 
     playlistVideosContainer.appendChild(card);
   });
 }
+
 
 if (uploadMp3Button && mp3FileInput) {
   uploadMp3Button.addEventListener("click", () => {
