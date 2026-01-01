@@ -8,6 +8,14 @@
         "rating": 0,
         "type": "youtube",
         "filePath": null
+      },
+      {
+        "videoId": "mp3-1767304432242-sp3ume",
+        "title": "file_example_MP3_700KB",
+        "thumbnail": "",
+        "rating": 0,
+        "type": "mp3",
+        "filePath": "/uploads/1767304432230_file_example_MP3_700KB.mp3"
       }
     ]
   },

@@ -45,6 +45,9 @@ const sortByRatingButton = document.getElementById("sortByRatingButton");
 const currentPlaylistTitle = document.getElementById("currentPlaylistTitle");
 const newPlaylistBtn = document.getElementById("newPlaylistBtn");
 const playlistsList = document.getElementById("playlistsList");
+const mp3FileInput = document.getElementById("mp3FileInput");
+const uploadMp3Button = document.getElementById("uploadMp3Button");
+
 
 // Internal UI state
 let searchTerm = "";
@@ -152,6 +155,65 @@ async function removeVideoFromServer(playlistName, videoId) {
   }
 }
 
+/**
+ * Upload MP3 file for the current playlist and add it as a track.
+ */
+async function uploadMp3ForCurrentPlaylist() {
+  if (!currentUser) return;
+
+  if (!mp3FileInput || !mp3FileInput.files || mp3FileInput.files.length === 0) {
+    alert("Please choose an MP3 file to upload.");
+    return;
+  }
+
+  const file = mp3FileInput.files[0];
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("playlistName", currentPlaylistName);
+
+  try {
+    const res = await fetch(
+      `/api/playlists/${encodeURIComponent(currentUser.username)}/upload-mp3`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    if (!res.ok) {
+      let msg = "Upload failed. Please try again.";
+      try {
+        const errData = await res.json();
+        if (errData && errData.error) {
+          msg = errData.error;
+        }
+      } catch (e) {
+        // ignore parse error
+      }
+      alert(msg);
+      return;
+    }
+
+    const data = await res.json();
+    const track = data.track;
+
+    if (!userPlaylists[currentPlaylistName]) {
+      userPlaylists[currentPlaylistName] = [];
+    }
+    userPlaylists[currentPlaylistName].push(track);
+
+    // Clear file input
+    mp3FileInput.value = "";
+
+    // Re-render playlist
+    renderPlaylist();
+  } catch (err) {
+    console.error("Error uploading MP3", err);
+    alert("Network error while uploading MP3.");
+  }
+}
+
 // ----- Rendering -----
 
 function renderSidebarPlaylists() {
@@ -242,6 +304,15 @@ function renderPlaylist() {
     const ratingDiv = document.createElement("div");
     ratingDiv.className = "video-rating";
 
+    let audioEl = null;
+    if (video.type === "mp3" && video.filePath) {
+      audioEl = document.createElement("audio");
+      audioEl.controls = true;
+      audioEl.src = video.filePath;
+      audioEl.style.marginTop = "6px";
+    }
+
+
     const ratingLabel = document.createElement("span");
     ratingLabel.textContent = "Rating: ";
 
@@ -269,10 +340,13 @@ function renderPlaylist() {
     playBtn.addEventListener("click", () => {
       if (video.type === "youtube" && video.videoId) {
         openModal(video.videoId, video.title || "");
+      } else if (video.type === "mp3" && audioEl) {
+        audioEl.play().catch(() => {});
       } else {
-        alert("Play for MP3 will be implemented later.");
+        alert("Cannot play this item.");
       }
     });
+
 
     removeBtn.addEventListener("click", async () => {
       await removeVideoFromServer(currentPlaylistName, video.videoId);
@@ -292,7 +366,18 @@ function renderPlaylist() {
     card.appendChild(img);
     card.appendChild(infoDiv);
 
+    if (audioEl) {
+    infoDiv.appendChild(audioEl);
+    }
+
+
     playlistVideosContainer.appendChild(card);
+  });
+}
+
+if (uploadMp3Button && mp3FileInput) {
+  uploadMp3Button.addEventListener("click", () => {
+    uploadMp3ForCurrentPlaylist();
   });
 }
 

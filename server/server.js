@@ -3,21 +3,23 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
+const multer = require("multer");
 
 const app = express();
 const PORT = 3000;
 
-// Parse JSON bodies
-app.use(express.json());
-
-// Serve static files from ../public
-app.use(express.static(path.join(__dirname, "..", "public")));
-
-// ----- Data files (users + playlists) -----
+// ----- Paths & data files -----
 
 const DATA_DIR = path.join(__dirname, "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 const PLAYLISTS_FILE = path.join(DATA_DIR, "playlists.json");
+
+const UPLOADS_DIR = path.join(__dirname, "uploads");
+
+// Make sure uploads directory exists
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
 
 // Make sure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
@@ -33,6 +35,35 @@ if (!fs.existsSync(USERS_FILE)) {
 if (!fs.existsSync(PLAYLISTS_FILE)) {
   fs.writeFileSync(PLAYLISTS_FILE, "{}", "utf8");
 }
+
+// Parse JSON + form bodies
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve uploaded files
+app.use("/uploads", express.static(UPLOADS_DIR));
+
+// Serve static files from ../public
+app.use(express.static(path.join(__dirname, "..", "public")));
+
+// Multer storage for MP3 uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: (req, file, cb) => {
+    const safeName = (file.originalname || "audio.mp3").replace(/[^\w.\-]/g, "_");
+    cb(null, Date.now() + "_" + safeName);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB
+  },
+});
+
 
 // Helper to read JSON safely
 function readJson(filePath, fallback) {
@@ -263,6 +294,70 @@ app.delete("/api/playlists/:username/remove", (req, res) => {
   return res.json({ message: "Video removed", playlistName, videoId });
 });
 
+// Upload MP3 and add it as a track into a playlist
+app.post(
+  "/api/playlists/:username/upload-mp3",
+  upload.single("file"),
+  (req, res) => {
+        console.log("UPLOAD MP3 route called");
+    console.log("Body:", req.body);
+    console.log(
+      "File:",
+      req.file && req.file.originalname,
+      req.file && req.file.mimetype
+    );
+    
+    const username = req.params.username;
+    const playlistName = req.body.playlistName;
+
+    if (!username || !playlistName) {
+      return res
+        .status(400)
+        .json({ error: "Missing username or playlistName." });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded." });
+    }
+
+    const all = readAllPlaylists();
+    if (!all[username]) {
+      all[username] = {};
+    }
+    if (!all[username][playlistName]) {
+      all[username][playlistName] = [];
+    }
+
+    const list = all[username][playlistName];
+
+    const fileUrl = `/uploads/${req.file.filename}`;
+    const originalName = req.file.originalname || "MP3 track";
+    const titleWithoutExt = originalName.replace(/\.[^/.]+$/, "");
+
+    const mp3Id = `mp3-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+
+    const track = {
+      videoId: mp3Id,
+      title: titleWithoutExt,
+      thumbnail: "",
+      rating: 0,
+      type: "mp3",
+      filePath: fileUrl,
+    };
+
+    list.push(track);
+    all[username][playlistName] = list;
+    writeAllPlaylists(all);
+
+    return res.status(201).json({
+      message: "MP3 uploaded and added to playlist",
+      playlistName,
+      track,
+    });
+  }
+);
 
 // ----- Start server -----
 

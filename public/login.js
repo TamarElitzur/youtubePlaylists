@@ -3,13 +3,20 @@ console.log("login.js loaded");
 const loginForm = document.getElementById("loginForm");
 const loginErrorDiv = document.getElementById("loginErrorMessages");
 
-// helper to clear error
+/**
+ * Show a single error message in the login error div.
+ */
 function showLoginError(msg) {
-  if (!loginErrorDiv) return;
+  if (!loginErrorDiv) {
+    console.error("loginErrorMessages element not found in DOM");
+    return;
+  }
   loginErrorDiv.textContent = msg || "";
 }
 
-if (loginForm) {
+if (!loginForm) {
+  console.error("loginForm not found in DOM");
+} else {
   loginForm.addEventListener("submit", async function (event) {
     event.preventDefault();
 
@@ -26,6 +33,7 @@ if (loginForm) {
     }
 
     try {
+      console.log("Sending /api/login request...");
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -43,7 +51,7 @@ if (loginForm) {
         return;
       }
 
-      // login success – save currentUser in sessionStorage like before
+      // Login success – save the user in sessionStorage
       const user = data.user || {};
       const currentUser = {
         username: user.username,
@@ -53,7 +61,7 @@ if (loginForm) {
 
       sessionStorage.setItem("currentUser", JSON.stringify(currentUser));
 
-      // check for returnUrl in URL
+      // Check if we came here with returnUrl in query string
       const url = new URL(window.location.href);
       const returnUrl = url.searchParams.get("returnUrl");
 
@@ -69,6 +77,4 @@ if (loginForm) {
       showLoginError("Network error. Please try again later.");
     }
   });
-} else {
-  console.error("loginForm not found in DOM");
 }
