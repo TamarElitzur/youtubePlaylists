@@ -246,16 +246,15 @@ function renderSidebarPlaylists() {
  * Render the current playlist according to search + sort.
  */
 function renderPlaylist() {
-  // Make sure we have playlists data for the current user
   if (!userPlaylists || !userPlaylists[currentPlaylistName]) {
     playlistVideosContainer.innerHTML = "No videos in this playlist yet.";
     return;
   }
 
-  // Start with raw list from server / state
+  // Start with raw list for current playlist
   let videos = [...userPlaylists[currentPlaylistName]];
 
-  // Filter by inner search
+  // Filter by search term
   if (searchTerm) {
     const lower = searchTerm.toLowerCase();
     videos = videos.filter((v) =>
@@ -283,21 +282,55 @@ function renderPlaylist() {
   videos.forEach((video) => {
     const isMp3 = video.type === "mp3";
 
+    // === Card container ===
     const card = document.createElement("div");
     card.className = "playlist-video-card";
+    if (isMp3) {
+      card.classList.add("mp3-track");
+    } else {
+      card.classList.add("youtube-track");
+    }
 
-    const img = document.createElement("img");
-    // For MP3 we may not have thumbnail, so this can be empty
-    img.src = video.thumbnail || "";
-    img.alt = video.title || "";
+    // === Thumbnail / icon area ===
+    const thumb = document.createElement("div");
+    thumb.className = "video-thumb";
+    if (isMp3) {
+      thumb.classList.add("video-thumb-mp3");
+      const iconSpan = document.createElement("span");
+      iconSpan.textContent = "🎵";
+      thumb.appendChild(iconSpan);
+    } else {
+      const img = document.createElement("img");
+      img.src = video.thumbnail || "";
+      img.alt = video.title || "";
+      thumb.appendChild(img);
 
+      img.addEventListener("click", () => {
+        openModal(video.videoId, video.title || "");
+      });
+    }
+
+    // === Info column ===
     const infoDiv = document.createElement("div");
     infoDiv.className = "video-info";
+
+    // Title + type badge in one row
+    const titleRow = document.createElement("div");
+    titleRow.className = "video-title-row";
 
     const titleEl = document.createElement("h3");
     titleEl.textContent = video.title || "";
     titleEl.title = video.title || "";
 
+    const typeBadge = document.createElement("span");
+    typeBadge.className =
+      "track-type-badge " + (isMp3 ? "track-type-mp3" : "track-type-youtube");
+    typeBadge.textContent = isMp3 ? "MP3" : "YouTube";
+
+    titleRow.appendChild(titleEl);
+    titleRow.appendChild(typeBadge);
+
+    // Actions
     const actionsDiv = document.createElement("div");
     actionsDiv.className = "video-actions";
 
@@ -307,6 +340,19 @@ function renderPlaylist() {
     const removeBtn = document.createElement("button");
     removeBtn.textContent = "Remove";
 
+    // Optional download link for MP3
+    if (isMp3 && video.filePath) {
+      const downloadLink = document.createElement("a");
+      downloadLink.href = video.filePath;
+      downloadLink.download = (video.title || "track") + ".mp3";
+      downloadLink.textContent = "Download";
+      actionsDiv.appendChild(downloadLink);
+    }
+
+    actionsDiv.appendChild(playBtn);
+    actionsDiv.appendChild(removeBtn);
+
+    // Rating
     const ratingDiv = document.createElement("div");
     ratingDiv.className = "video-rating";
 
@@ -327,16 +373,21 @@ function renderPlaylist() {
     }
 
     ratingSelect.addEventListener("change", () => {
-      updateVideoRatingOnServer(video.videoId, Number(ratingSelect.value));
-      // Also update local state
+      const newRating = Number(ratingSelect.value);
+      // Update on server
+      updateVideoRatingOnServer(currentPlaylistName, video.videoId, newRating);
+      // Update in local state
       const list = userPlaylists[currentPlaylistName] || [];
       const track = list.find((v) => v.videoId === video.videoId);
       if (track) {
-        track.rating = Number(ratingSelect.value);
+        track.rating = newRating;
       }
     });
 
-    // Optional audio element for MP3 tracks
+    ratingDiv.appendChild(ratingLabel);
+    ratingDiv.appendChild(ratingSelect);
+
+    // Audio element for MP3
     let audioEl = null;
     if (isMp3 && video.filePath) {
       audioEl = document.createElement("audio");
@@ -345,42 +396,42 @@ function renderPlaylist() {
       audioEl.style.marginTop = "6px";
     }
 
-    // Events
-    img.addEventListener("click", () => {
-      if (isMp3 && audioEl) {
+    // === Click behaviors ===
+    const playMp3 = () => {
+      if (audioEl) {
         audioEl.play().catch(() => {});
-      } else {
-        openModal(video.videoId, video.title || "");
       }
-    });
+    };
 
     titleEl.addEventListener("click", () => {
-      if (isMp3 && audioEl) {
-        audioEl.play().catch(() => {});
+      if (isMp3) {
+        playMp3();
       } else {
         openModal(video.videoId, video.title || "");
       }
     });
 
     playBtn.addEventListener("click", () => {
-      if (isMp3 && audioEl) {
-        audioEl.play().catch(() => {});
+      if (isMp3) {
+        playMp3();
       } else {
         openModal(video.videoId, video.title || "");
       }
     });
 
     removeBtn.addEventListener("click", () => {
-      removeVideoFromServer(video.videoId);
+      const confirmed = confirm("Remove this track from the playlist?");
+      if (!confirmed) return;
+
+      removeVideoFromServer(currentPlaylistName, video.videoId)
+      .then(() => {
+        renderPlaylist();
+      });
+
     });
 
-    actionsDiv.appendChild(playBtn);
-    actionsDiv.appendChild(removeBtn);
-
-    ratingDiv.appendChild(ratingLabel);
-    ratingDiv.appendChild(ratingSelect);
-
-    infoDiv.appendChild(titleEl);
+    // Assemble info section
+    infoDiv.appendChild(titleRow);
     infoDiv.appendChild(actionsDiv);
     infoDiv.appendChild(ratingDiv);
 
@@ -388,12 +439,14 @@ function renderPlaylist() {
       infoDiv.appendChild(audioEl);
     }
 
-    card.appendChild(img);
+    // Assemble card
+    card.appendChild(thumb);
     card.appendChild(infoDiv);
 
     playlistVideosContainer.appendChild(card);
   });
 }
+
 
 
 if (uploadMp3Button && mp3FileInput) {
